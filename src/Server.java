@@ -20,10 +20,13 @@ public class Server {
 	 * The socket for the server which will be set to use port 69
 	 */
 	private DatagramSocket receiveSocket;
+	
+	private DatagramSocket tempSocket;
+	private DatagramPacket sendHostPacket;
 
 	public Server() {
 		try {
-			receiveSocket = new DatagramSocket(69);
+			receiveSocket = new DatagramSocket(1069);
 		} catch (SocketException e) {
 			e.printStackTrace();
 		}
@@ -81,7 +84,7 @@ public class Server {
 	 */
 	public void runServer() throws Exception {
 		byte[] b = new byte[100];
-		DatagramPacket receival = new DatagramPacket(b, b.length);
+		final DatagramPacket receival = new DatagramPacket(b, b.length);
 		try {
 			while (true) {
 				System.out.println("---------------------------------");
@@ -102,17 +105,31 @@ public class Server {
 						response[2] = (byte) 0;
 						response[3] = (byte) 0;
 					}
+					
 				} else {
 					throw new Exception("Invalid Request");
 				}
-
-				//Sending response to host
-				DatagramPacket sendHostPacket = new DatagramPacket(response, response.length, InetAddress.getLocalHost(), receival.getPort());
-				System.out.println("Sending the following response to Host: ");
-				Client.printByteArray(response, response.length);
-				DatagramSocket tempSocket = new DatagramSocket();
-				tempSocket.send(sendHostPacket);
-				tempSocket.close();
+				sendHostPacket = new DatagramPacket(response, response.length, InetAddress.getLocalHost(), receival.getPort());
+				new Thread(new Runnable() {
+					@Override
+					public void run(){
+						System.out.println("Sending the following response to Host: ");
+						Client.printByteArray(response, response.length);
+						try {
+							tempSocket = new DatagramSocket();
+						} catch (SocketException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+						try {
+							tempSocket.send(sendHostPacket);
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+						tempSocket.close();
+					}
+				}).start();		
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
