@@ -1,18 +1,36 @@
+import java.io.BufferedInputStream;
+import java.io.FileInputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+
 public class Client {
+
+	/**
+	 * Type of mode the user has entered ("Read" or "Write")
+	 */
+	private String mode;
+	
+	/**
+	 * Name of the file the user has entered
+	 */
+	private String file;
 
 	/**
 	 * The DatagramSocket that the client will use to send and receive
 	 */
-	private DatagramSocket sendReceive;
-
+	private DatagramSocket sendReceive;	
+	
+	private ErrorSimulator simulator;
+	
 	public Client() {
 		try {
 			sendReceive = new DatagramSocket();
+			simulator = new ErrorSimulator();
 		} catch (SocketException e) {
 			e.printStackTrace();
 		}
@@ -63,52 +81,66 @@ public class Client {
 		return b;
 	}
 
+	public void launchUserInterface() {
+		JLabel modeLabel = new JLabel("Enter Command (\"Read\" or \"Write\" or \"Close\")");
+		mode = JOptionPane.showInputDialog(null, modeLabel, "Enter Mode", JOptionPane.INFORMATION_MESSAGE).toLowerCase();
+		JLabel fileLabel = new JLabel("Enter File Name");
+		file = JOptionPane.showInputDialog(null, fileLabel, "Enter File Name", JOptionPane.INFORMATION_MESSAGE).toLowerCase();
+	}
+
 	/**
 	 * This method is used to run the Client
 	 */
 	public void runClient() {
 		System.out.println("--------------------------------------");
-		for (int i = 0; i < 11; i++) {
-			String file = "assign1.txt";
-			String mode = "ocTEt";
+		while(true) {
+			launchUserInterface();
 			byte[] request;
-			if (i == 10) {
-				System.out.println("Sending Invalid Request");
-				request = createRequest("Invalid", file, mode);
+			if (mode.equals("read")) {
+				System.out.println("Read Request");
+				request = createRequest("Read", file, "mode");
+			} else if (mode.equals("write")) {
+				System.out.println("Write Request");
+				request = createRequest("Write", file, "mode");
+			} else if (mode.equals("close")){
+				request = createRequest("Invalid", file, "mode");
 			} else {
-				if (i % 2 == 0) {
-					System.out.println("Read Request");
-					request = createRequest("Read", file, mode);
-				} else {
-					System.out.println("Write Request");
-					request = createRequest("Write", file, mode);
-				}
+				continue;
 			}
+			
+			System.out.println("Sending following data to port Error Simulator: ");
+			DatagramPacket p;
+			try {
+				// send to host
+				p = new DatagramPacket(request, request.length, InetAddress.getLocalHost(), simulator.getClientPort());
+				printByteArray(request, request.length);
+				sendReceive.send(p);
 
-			new Thread(new Runnable() {
-				@Override
-				public void run() {
-					// TODO Auto-generated method stub
-					System.out.println("Sending following data to port 68: ");
-					DatagramPacket p;
-					try {
-						// send to host
-						p = new DatagramPacket(request, request.length, InetAddress.getLocalHost(), 1068);
-						printByteArray(request, request.length);
-						sendReceive.send(p);
-
-						// Receive from host
-						byte[] receive = new byte[4];
-						DatagramPacket received = new DatagramPacket(receive, receive.length);
+				// Receive from host
+				byte[] receive = new byte[4];
+				DatagramPacket received = new DatagramPacket(receive, receive.length);
+				sendReceive.receive(received);
+				if (receive[0] == 0 && receive[1] == 4) { //ACK BLOCK
+					BufferedInputStream input = new BufferedInputStream(new FileInputStream(file));
+					byte[] sendingData = new byte[512];
+					int x;
+					while ((x = input.read(sendingData)) != -1) {
+						System.out.println(x);
+						DatagramPacket fileTransfer = new DatagramPacket(sendingData, x, InetAddress.getLocalHost(), received.getPort());
+						sendReceive.send(fileTransfer);
 						sendReceive.receive(received);
-						System.out.println("Received the following from host:");
-						printByteArray(receive, received.getLength());
-						System.out.println("--------------------------------------");
-					} catch (Exception e1) {
-						e1.printStackTrace();
 					}
+					byte[] empty = new byte[0];
+					DatagramPacket fileTransfer = new DatagramPacket(empty, 0, InetAddress.getLocalHost(), received.getPort());
+					sendReceive.send(fileTransfer);
 				}
-			}).start();
+
+				System.out.println("Received the following from host:");
+				printByteArray(receive, received.getLength());
+				System.out.println("--------------------------------------");
+			} catch (Exception e1) {
+				e1.printStackTrace();
+			}
 		}
 	}
 

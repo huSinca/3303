@@ -1,3 +1,5 @@
+import java.io.BufferedOutputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -10,23 +12,20 @@ public class Server {
 	 * The name of the file received from the request from the intermediate host
 	 */
 	private String receivedFileName;
-	
+
 	/**
 	 * The name of the mode received from the request from the intermediate host
 	 */
 	private String receivedMode;
-	
+
 	/**
 	 * The socket for the server which will be set to use port 69
 	 */
 	private DatagramSocket receiveSocket;
-	
-	private DatagramSocket tempSocket;
-	private DatagramPacket sendHostPacket;
 
 	public Server() {
 		try {
-			receiveSocket = new DatagramSocket(1069);
+			receiveSocket = new DatagramSocket(69);
 		} catch (SocketException e) {
 			e.printStackTrace();
 		}
@@ -78,58 +77,80 @@ public class Server {
 		}
 	}
 
+	public void write(byte[] receivedPacket, int port) {
+		DatagramSocket errorSimSocket;
+		byte block;
+		byte[] connection = new byte[4];
+		connection[0] = (byte) 0;
+		connection[1] = (byte) 4;
+		connection[2] = (byte) 0;
+		connection[3] = (byte) 0;
+		block = 0;
+		try {
+			DatagramPacket establishPacket = new DatagramPacket(connection, connection.length, 
+					InetAddress.getLocalHost(), port);
+			errorSimSocket = new DatagramSocket();
+			errorSimSocket.send(establishPacket);
+
+			BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream("out.txt"));
+			while(true) {
+				byte[] receiveFile = new byte[512];
+				establishPacket = new DatagramPacket(receiveFile, receiveFile.length);
+				errorSimSocket.receive(establishPacket);
+				if (establishPacket.getLength() == 0) break;
+				System.out.println("Write");
+				out.write(receiveFile, 0, 512);
+				block++;
+				connection[3] = block;
+				DatagramPacket acknowledge = new DatagramPacket(connection, connection.length, 
+						InetAddress.getLocalHost(), establishPacket.getPort());
+				errorSimSocket.send(acknowledge);
+			}
+			out.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void read(byte[] receivedPacket, int port) {
+		DatagramSocket errorSimSocket;
+		byte[] b = receivedPacket;
+		byte block;
+		byte[] connection = new byte[4];
+		connection[0] = (byte) 0;
+		connection[1] = (byte) 3;
+		connection[2] = (byte) 0;
+		connection[3] = (byte) 1;
+		block = 1;
+	}
+
 	/**
 	 * This method is used to run the Server
 	 * @throws Exception when an invalid request is received
 	 */
 	public void runServer() throws Exception {
 		byte[] b = new byte[100];
-		final DatagramPacket receival = new DatagramPacket(b, b.length);
+		DatagramPacket receival = new DatagramPacket(b, b.length);
 		try {
 			while (true) {
 				System.out.println("---------------------------------");
 				System.out.println("Waiting to Receive from Host");
 				receiveSocket.receive(receival);
-				System.out.println("Received the following from host: ");
-				Client.printByteArray(b, receival.getLength());
-				byte[] response = new byte[4];
+				int port = receival.getPort();
 				if (isValid(b)) {
-					if (b[1] == 1) {	//Read Response
-						response[0] = (byte) 0;
-						response[1] = (byte) 3;
-						response[2] = (byte) 0;
-						response[3] = (byte) 1;
-					} else {			//Write Response
-						response[0] = (byte) 0;
-						response[1] = (byte) 4;
-						response[2] = (byte) 0;
-						response[3] = (byte) 0;
-					}
-					
+					new Thread(new Runnable() {
+						@Override
+						public void run() {
+							if (b[1] == 1) {
+								read(b, port);
+							} else {
+								write(b, port);
+							}
+						}
+					}).start();
 				} else {
 					throw new Exception("Invalid Request");
-				}
-				sendHostPacket = new DatagramPacket(response, response.length, InetAddress.getLocalHost(), receival.getPort());
-				new Thread(new Runnable() {
-					@Override
-					public void run(){
-						System.out.println("Sending the following response to Host: ");
-						Client.printByteArray(response, response.length);
-						try {
-							tempSocket = new DatagramSocket();
-						} catch (SocketException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-						try {
-							tempSocket.send(sendHostPacket);
-						} catch (IOException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-						tempSocket.close();
-					}
-				}).start();		
+				}	
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
