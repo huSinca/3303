@@ -141,10 +141,11 @@ public class Client {
 			DatagramPacket p;
 			try {
 				// send to host
+				simulator = new ErrorSimulator();
 				p = new DatagramPacket(request, request.length, InetAddress.getLocalHost(), simulator.getClientPort());
 				printByteArray(request, request.length);
 				sendReceive.send(p);
-
+				
 				// Receive from host
 				byte[] receive = new byte[516];
 				DatagramPacket received = new DatagramPacket(receive, receive.length);
