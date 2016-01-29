@@ -1,5 +1,6 @@
-import java.awt.event.KeyEvent;
+import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -27,9 +28,9 @@ public class Server {
 	 * The socket for the server which will be set to use port 69
 	 */
 	private DatagramSocket receiveSocket;
-	
+
 	private boolean shutdown;
-	
+
 	private Stack<Integer> activeThreads;
 
 	public Server() {
@@ -101,19 +102,18 @@ public class Server {
 			errorSimSocket = new DatagramSocket();
 			errorSimSocket.send(establishPacket);
 
-			BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream("out.txt"));
+			BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream("write.txt"));
 			while(true) {
-				byte[] receiveFile = new byte[512];
+				byte[] receiveFile = new byte[516];
 				establishPacket = new DatagramPacket(receiveFile, receiveFile.length);
 				errorSimSocket.receive(establishPacket);
-				if (establishPacket.getLength() == 0) break;
-				//System.out.println("Write");
-				out.write(receiveFile, 0, 512);
-				block++;
-				connection[3] = block;
+				out.write(receiveFile, 4, establishPacket.getLength() - 4);
 				DatagramPacket acknowledge = new DatagramPacket(connection, connection.length, 
 						InetAddress.getLocalHost(), establishPacket.getPort());
 				errorSimSocket.send(acknowledge);
+				if (establishPacket.getLength() < 516) break;
+				block++;
+				connection[3] = block;
 			}
 			out.close();
 		} catch (Exception e) {
@@ -123,14 +123,31 @@ public class Server {
 
 	public void read(byte[] receivedPacket, int port) {
 		DatagramSocket errorSimSocket;
-		byte[] b = receivedPacket;
 		byte block;
-		byte[] connection = new byte[4];
-		connection[0] = (byte) 0;
-		connection[1] = (byte) 3;
-		connection[2] = (byte) 0;
-		connection[3] = (byte) 1;
+		byte[] receive = new byte[4];
+		DatagramPacket received = new DatagramPacket(receive, receive.length);
 		block = 1;
+		try {
+			errorSimSocket = new DatagramSocket();
+			byte[] sendingData = new byte[512];
+			BufferedInputStream input = new BufferedInputStream(new FileInputStream(receivedFileName));
+			int x;
+			while ((x = input.read(sendingData)) != -1) {
+				byte[] connection = new byte[516];
+				connection[0] = (byte) 0;
+				connection[1] = (byte) 3;
+				connection[2] = (byte) 0;
+				connection[3] = block;
+				System.arraycopy(sendingData, 0, connection, 4, sendingData.length);
+				DatagramPacket fileTransfer = new DatagramPacket(connection, x + 4, InetAddress.getLocalHost(), port);
+				errorSimSocket.send(fileTransfer);
+				errorSimSocket.receive(received);
+				block++;
+			}
+			input.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 
@@ -163,28 +180,27 @@ public class Server {
 		}).start();
 		try {
 			while (true) {
-		
-					System.out.println("---------------------------------");
-					System.out.println("Waiting to Receive from Host");
-					receiveSocket.receive(receival);
-					int port = receival.getPort();
-					if (isValid(b)) {
-						new Thread(new Runnable() {
-							@Override
-							public void run() {
-								activeThreads.push(1);
-								if (b[1] == 1) {
-									read(b, port);
-								} else {
-									write(b, port);
-								}
-								activeThreads.pop();
+				System.out.println("---------------------------------");
+				System.out.println("Waiting to Receive from Host");
+				receiveSocket.receive(receival);
+				int port = receival.getPort();
+				if (isValid(b)) {
+					new Thread(new Runnable() {
+						@Override
+						public void run() {
+							activeThreads.push(1);
+							if (b[1] == 1) {
+								read(b, port);
+							} else {
+								write(b, port);
 							}
-						}).start();
-					} else {
-						throw new Exception("Invalid Request");
-					}
-				
+							activeThreads.pop();
+						}
+					}).start();
+				} else {
+					throw new Exception("Invalid Request");
+				}
+
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
