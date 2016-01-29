@@ -28,7 +28,7 @@ public class Server {
 	 */
 	private DatagramSocket receiveSocket;
 
-	private int threadCount = 0;
+	private Stack<Integer> activeThreads = new Stack<Integer>();
 	
 	/**
 	 *  Shutdown flag to show if shutdown has been requested
@@ -89,11 +89,6 @@ public class Server {
 		}
 	}
 
-	/**
-	 * This method is used to write from the client to the server
-	 * @param receivedPacket the byte array received from the client
-	 * @param port the port the packet was received from
-	 */
 	public void write(byte[] receivedPacket, int port) {
 		DatagramSocket errorSimSocket;
 		byte block;
@@ -128,11 +123,6 @@ public class Server {
 		}
 	}
 
-	/**
-	 * This function is used to read from the server and send back to the client
-	 * @param receivedPacket the byte array received from the client
-	 * @param port the port number received the packet was received from
-	 */
 	public void read(byte[] receivedPacket, int port) {
 		DatagramSocket errorSimSocket;
 		byte block;
@@ -169,7 +159,6 @@ public class Server {
 	 */
 	public void runServer() throws Exception {
 		byte[] b = new byte[100];
-		Stack <Integer> activeThreads = new Stack<Integer>();
 		DatagramPacket receival = new DatagramPacket(b, b.length);
 		
 		/**
@@ -193,7 +182,7 @@ public class Server {
 							shutdown = true;
 						}
 					}
-					else if (shutdown && threadCount == 0) { // wait till all active threads finish & shutdown requested
+					else if (shutdown && activeThreads.isEmpty()) { // wait till all active threads finish & shutdown requested
 						System.out.println("Shutting server down");
 						System.exit(0);
 					}
@@ -210,14 +199,12 @@ public class Server {
 					new Thread(new Runnable() {
 						@Override
 						public void run() {
-							activeThreads.push(1);
-							threadCount++;
+							activeThreads.push(0);
 							if (b[1] == 1) {
 								read(b, port);
 							} else {
 								write(b, port);
 							}
-							threadCount--;
 							activeThreads.pop();
 						}
 					}).start();
