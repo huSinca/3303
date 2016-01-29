@@ -176,16 +176,17 @@ public class Client {
 					byte block = 0;
 					BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream("read.txt"));
 					out.write(receive, 4, received.getLength() - 4);
+					DatagramPacket acknowledge = new DatagramPacket(ack, 4, InetAddress.getLocalHost(), received.getPort());
+					sendReceive.send(acknowledge);
 					int x = received.getLength();
 					while (x == 516) {
 						ack[3] = block;
-						block++;			
-						DatagramPacket acknowledge = new DatagramPacket(ack, 4, InetAddress.getLocalHost(), received.getPort());
-						sendReceive.send(acknowledge);
+						block++;
 						byte[] receiveFile = new byte[516];
 						DatagramPacket fileTransfer = new DatagramPacket(receiveFile, receiveFile.length);						
 						sendReceive.receive(fileTransfer);
 						out.write(receiveFile, 4, fileTransfer.getLength() - 4);
+						sendReceive.send(acknowledge);
 						x = fileTransfer.getLength();
 					}
 					out.close();
