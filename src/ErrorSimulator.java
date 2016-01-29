@@ -5,10 +5,14 @@ import java.net.InetAddress;
 import java.net.SocketException;
 
 public class ErrorSimulator {
-	// This socket will be used to send and receive to and from the client
+	/**
+	 *  This socket will be used to send and receive to and from the client
+	 */	
 	private DatagramSocket clientSocket;
 	
-	//This socket will be used to send and receive to and from the server
+	/**
+	 * This socket will be used to send and receive to and from the server
+	 */
 	private DatagramSocket serverSocket;
 
 	public ErrorSimulator() {
@@ -25,6 +29,10 @@ public class ErrorSimulator {
 			}
 		}).start();
 	}
+	
+	/**
+	 * @return the port the client socket uses
+	 */
 	
 	public int getClientPort() {
 		return clientSocket.getLocalPort();

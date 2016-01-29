@@ -11,16 +11,24 @@ import javax.swing.JOptionPane;
 
 public class Client {
 
-	// Type of mode the user has entered ("Read" or "Write")
+	/**
+	 * Type of mode the user has entered ("Read" or "Write")
+	 */
 	private String mode;
 	
-	// Name of the file the user has entered
+	/**
+	 *  Name of the file the user has entered
+	 */
 	private String file;
 
-	// The DatagramSocket that the client will use to send and receive
+	/**
+	 *  The DatagramSocket that the client will use to send and receive
+	 */
 	private DatagramSocket sendReceive;	
 	
-	// ErrorSimulator object created with client for future iterations
+	/** 
+	 * ErrorSimulator object created with client for future iterations
+	 */
 	private ErrorSimulator simulator;
 	
 	public Client() {

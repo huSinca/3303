@@ -12,16 +12,27 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 
 public class Server {
-	// The name of the file received from the request from the intermediate host
+	
+	/**
+	 * The name of the file received from the request from the intermediate host
+	 */
 	private String receivedFileName;
 
-	// The name of the mode received from the request from the intermediate host
+	/**
+	 *  The name of the mode received from the request from the intermediate host
+	 */
 	private String receivedMode;
 
-	// The socket for the server which will be set to use port 69
+	/**
+	 * The socket for the server which will be set to use port 69
+	 */
 	private DatagramSocket receiveSocket;
 
-	// Shutdown flag to show if shutdown has been requested
+	private int threadCount = 0;
+	
+	/**
+	 *  Shutdown flag to show if shutdown has been requested
+	 */
 	private boolean shutdown;
 
 	public Server() {
@@ -148,7 +159,8 @@ public class Server {
 	 */
 	public void runServer() throws Exception {
 		byte[] b = new byte[100];
-		Stack <Integer>activeThreads = new Stack<Integer>();
+		Stack <Integer> activeThreads = new Stack<Integer>();
+		//int threadCount = 0;
 		DatagramPacket receival = new DatagramPacket(b, b.length);
 		
 		/**
@@ -172,7 +184,7 @@ public class Server {
 							shutdown = true;
 						}
 					}
-					else if (shutdown && activeThreads.isEmpty()) { // wait till all active threads finish & shutdown requested
+					else if (shutdown && threadCount == 0) { // wait till all active threads finish & shutdown requested
 						System.out.println("Shutting server down");
 						System.exit(0);
 					}
@@ -190,11 +202,13 @@ public class Server {
 						@Override
 						public void run() {
 							activeThreads.push(1);
+							threadCount++;
 							if (b[1] == 1) {
 								read(b, port);
 							} else {
 								write(b, port);
 							}
+							threadCount--;
 							activeThreads.pop();
 						}
 					}).start();
