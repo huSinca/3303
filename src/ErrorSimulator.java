@@ -5,15 +5,10 @@ import java.net.InetAddress;
 import java.net.SocketException;
 
 public class ErrorSimulator {
-	
-	/**
-	 * This Socket will be set to use port 68 and will be used to receive from the Client
-	 */
+	// This socket will be used to send and receive to and from the client
 	private DatagramSocket clientSocket;
 	
-	/**
-	 * This socket will be used to send and receive to and from the server
-	 */
+	//This socket will be used to send and receive to and from the server
 	private DatagramSocket serverSocket;
 
 	public ErrorSimulator() {
@@ -41,6 +36,7 @@ public class ErrorSimulator {
 	public void runSimulator() {
 		byte[] b = new byte[516];
 		DatagramPacket receival = new DatagramPacket(b, b.length);
+		System.out.println("ErrorSimulator running for Client: " + getClientPort());
 		try {
 			clientSocket.receive(receival);
 			DatagramPacket send = new DatagramPacket(b, receival.getLength(), InetAddress.getLocalHost(), 69);
@@ -55,7 +51,7 @@ public class ErrorSimulator {
 				
 				byte[] clientReceival = new byte[516];
 				DatagramPacket receiveClientPacket = new DatagramPacket(clientReceival, clientReceival.length);
-				clientSocket.receive(receiveClientPacket);
+				clientSocket.receive(receiveClientPacket); //
 				DatagramPacket sendServer = new DatagramPacket(clientReceival, receiveClientPacket.getLength(), InetAddress.getLocalHost(), receiveFromServer.getPort());
 				serverSocket.send(sendServer);
 			}
@@ -63,10 +59,4 @@ public class ErrorSimulator {
 			e.printStackTrace();
 		}
 	}
-
-	public static void main( String args[] ) {
-		ErrorSimulator h = new ErrorSimulator();
-		h.runSimulator();
-	}
-
 }

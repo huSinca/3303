@@ -8,30 +8,21 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.util.Stack;
-
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 
 public class Server {
-
-	/**
-	 * The name of the file received from the request from the intermediate host
-	 */
+	// The name of the file received from the request from the intermediate host
 	private String receivedFileName;
 
-	/**
-	 * The name of the mode received from the request from the intermediate host
-	 */
+	// The name of the mode received from the request from the intermediate host
 	private String receivedMode;
 
-	/**
-	 * The socket for the server which will be set to use port 69
-	 */
+	// The socket for the server which will be set to use port 69
 	private DatagramSocket receiveSocket;
 
+	// Shutdown flag to show if shutdown has been requested
 	private boolean shutdown;
-
-	private Stack<Integer> activeThreads;
 
 	public Server() {
 		try {
@@ -157,21 +148,31 @@ public class Server {
 	 */
 	public void runServer() throws Exception {
 		byte[] b = new byte[100];
-		activeThreads = new Stack<Integer>();
+		Stack <Integer>activeThreads = new Stack<Integer>();
 		DatagramPacket receival = new DatagramPacket(b, b.length);
+		
+		/**
+		 * Thread created to launch prompt for server shutdown.
+		 * Thread is required as server could become blocked
+		 * with the receiveSocket.receive(receival) call as it will
+		 * wait to receive rather than quit. The thread ensures
+		 * that as long as no requests come in or no requests
+		 * are currently running, it will quit override and
+		 * quit.
+		 */
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
 				JLabel modeLabel = new JLabel("Shutdown Server?");
-				int close = 3;
-				while (true) {
+				int close;
+				while (true) { // run till shutdown requested
 					if(!shutdown) {
 						close = JOptionPane.showConfirmDialog(null, modeLabel, "Warning", JOptionPane.CLOSED_OPTION);
-						if (close == 0) {
+						if (close == 0) { // ok has been selected, set shutdown to true
 							shutdown = true;
 						}
 					}
-					else if (shutdown && activeThreads.isEmpty()) {
+					else if (shutdown && activeThreads.isEmpty()) { // wait till all active threads finish & shutdown requested
 						System.out.println("Shutting server down");
 						System.exit(0);
 					}
