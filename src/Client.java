@@ -1,9 +1,11 @@
 import java.io.BufferedInputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.util.concurrent.TimeUnit;
 
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -82,10 +84,37 @@ public class Client {
 	}
 
 	public void launchUserInterface() {
-		JLabel modeLabel = new JLabel("Enter Command (\"Read\" or \"Write\" or \"Close\")");
-		mode = JOptionPane.showInputDialog(null, modeLabel, "Enter Mode", JOptionPane.INFORMATION_MESSAGE).toLowerCase();
-		JLabel fileLabel = new JLabel("Enter File Name");
-		file = JOptionPane.showInputDialog(null, fileLabel, "Enter File Name", JOptionPane.INFORMATION_MESSAGE).toLowerCase();
+		boolean validCommand = false;
+		boolean validFileName = false;
+		while (!validCommand) {
+			JLabel modeLabel = new JLabel("Enter Command (\"Read\" or \"Write\" or \"Close\")");
+			try {
+				mode = JOptionPane.showInputDialog(null, modeLabel, "Enter Mode", JOptionPane.INFORMATION_MESSAGE).toLowerCase();
+			} catch (NullPointerException e) {
+				System.out.println("Closing client");
+				System.exit(0);
+			}
+
+			if (mode == null) {
+				System.exit(0);
+			} else if (mode.equals("read") || mode.equals("write") || mode.equals("read")) {
+				validCommand = true;
+			}
+		}
+		while (!validFileName) {
+			JLabel fileLabel = new JLabel("Enter File Name");
+			try {
+				file = JOptionPane.showInputDialog(null, fileLabel, "Enter File Name", JOptionPane.INFORMATION_MESSAGE).toLowerCase();
+			} catch (NullPointerException e) {
+				System.out.println("Closing client");
+				System.exit(0);
+			}
+			if (new File(file).exists()) {
+				validFileName = true;
+			} else {
+				System.out.println("File does not exist!");
+			}
+		}
 	}
 
 	/**
@@ -138,6 +167,7 @@ public class Client {
 				System.out.println("Received the following from host:");
 				printByteArray(receive, received.getLength());
 				System.out.println("--------------------------------------");
+				Thread.sleep(1000);
 			} catch (Exception e1) {
 				e1.printStackTrace();
 			}
