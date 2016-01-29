@@ -89,6 +89,11 @@ public class Server {
 		}
 	}
 
+	/**
+	 * This method is used to write from the client to the server
+	 * @param receivedPacket the byte array received from the client
+	 * @param port the port the packet was received from
+	 */
 	public void write(byte[] receivedPacket, int port) {
 		DatagramSocket errorSimSocket;
 		byte block;
@@ -123,6 +128,11 @@ public class Server {
 		}
 	}
 
+	/**
+	 * This function is used to read from the server and send back to the client
+	 * @param receivedPacket the byte array received from the client
+	 * @param port the port number received the packet was received from
+	 */
 	public void read(byte[] receivedPacket, int port) {
 		DatagramSocket errorSimSocket;
 		byte block;
@@ -160,7 +170,6 @@ public class Server {
 	public void runServer() throws Exception {
 		byte[] b = new byte[100];
 		Stack <Integer> activeThreads = new Stack<Integer>();
-		//int threadCount = 0;
 		DatagramPacket receival = new DatagramPacket(b, b.length);
 		
 		/**

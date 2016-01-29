@@ -32,8 +32,7 @@ public class ErrorSimulator {
 	
 	/**
 	 * @return the port the client socket uses
-	 */
-	
+	 */	
 	public int getClientPort() {
 		return clientSocket.getLocalPort();
 	}
