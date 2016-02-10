@@ -48,7 +48,7 @@ public class Server {
 	 * or a WRITE request. Also this method will extract the filename and the mode of
 	 * the request and place them in the global variables of the server
 	 * @param b the byte array received from the intermediate host
-	 * @return true if the request is valid
+	 * @return 0 if the request is valid, appropriate error code if not
 	 */
 	public boolean isValid(byte[] b) {
 		//Initial checks to see if it is a valid read/write request
@@ -152,6 +152,19 @@ public class Server {
 		}
 	}
 
+	private byte[] formErrorPacket(int errCode)
+	{
+		String errString = "error";	//Will be changed depending on the value of errCode
+		byte[] errMsg = errString.getBytes();
+		byte[] errPacket = new byte[5+errMsg.length];
+		errPacket[0] = (byte) 0;
+		errPacket[1] = (byte) 5;
+		errPacket[2] = (byte) (errCode/16);
+		errPacket[3] = (byte) (errCode%16);
+		System.arraycopy(errMsg, 0, errPacket, 4, errMsg.length);
+		errPacket[4+errMsg.length] = (byte) 0;
+		return errPacket;
+	}
 
 	/**
 	 * This method is used to run the Server
