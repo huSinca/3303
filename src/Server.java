@@ -48,18 +48,20 @@ public class Server {
 	 * or a WRITE request. Also this method will extract the filename and the mode of
 	 * the request and place them in the global variables of the server
 	 * @param b the byte array received from the intermediate host
-	 * @return 0 if the request is valid, appropriate error code if not
+	 * @return true if the request is valid
 	 */
-	public boolean isValid(byte[] b) {
+	public boolean isValid(byte[] b, int port) {
 		//Initial checks to see if it is a valid read/write request
 		if (b == null || b.length == 0) {
 			return false;
 		} else if (b[0] != 0) {
+			System.out.println("1");
 			return false;
 		} else if (b[1] != 1 && b[1] != 2) {
+			System.out.println("Data recieved from host has an invalid Opcode, reporting back to Host");
+			error((byte)4, port);
 			return false;
 		}
-
 		//Get the filename from the byte array
 		StringBuilder builder = new StringBuilder();
 		int index;
@@ -152,20 +154,26 @@ public class Server {
 		}
 	}
 
-	private byte[] formErrorPacket(int errCode)
-	{
-		String errString = "error";	//Will be changed depending on the value of errCode
-		byte[] errMsg = errString.getBytes();
-		byte[] errPacket = new byte[5+errMsg.length];
-		errPacket[0] = (byte) 0;
-		errPacket[1] = (byte) 5;
-		errPacket[2] = (byte) (errCode/16);
-		errPacket[3] = (byte) (errCode%16);
-		System.arraycopy(errMsg, 0, errPacket, 4, errMsg.length);
-		errPacket[4+errMsg.length] = (byte) 0;
-		return errPacket;
+	public void error(byte ErrorCode, int port){
+		DatagramSocket errorSimSocket;
+		byte block;
+		byte[] receive = new byte[4];
+		DatagramPacket received = new DatagramPacket(receive, receive.length);
+		block = 1;
+		try {
+			errorSimSocket = new DatagramSocket();
+			byte[] connection = new byte[516];
+			connection[0] = (byte) 0;
+			connection[1] = (byte) 5;
+			connection[2] = (byte) 0;
+			connection[3] = (byte) ErrorCode;
+			DatagramPacket ErrorMessage = new DatagramPacket(connection, 516, InetAddress.getLocalHost(), port);
+			errorSimSocket.send(ErrorMessage);
+			errorSimSocket.receive(received);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
-
 	/**
 	 * This method is used to run the Server
 	 * @throws Exception when an invalid request is received
@@ -208,21 +216,25 @@ public class Server {
 				System.out.println("Waiting to Receive from Host");
 				receiveSocket.receive(receival);
 				int port = receival.getPort();
-				if (isValid(b)) {
+				if (isValid(b,port)) {
 					new Thread(new Runnable() {
 						@Override
 						public void run() {
 							activeThreads.push(0);
 							if (b[1] == 1) {
 								read(b, port);
-							} else {
+								System.out.println("Read request recieved");
+							} else if (b[1] == 2){
 								write(b, port);
+								System.out.println("Write request recieved");
+							} else{
+								System.out.println("ERR");
 							}
 							activeThreads.pop();
 						}
 					}).start();
 				} else {
-					throw new Exception("Invalid Request");
+					//do nothing;
 				}
 
 			}

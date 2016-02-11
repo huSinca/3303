@@ -207,6 +207,8 @@ public class Client {
 						x = fileTransfer.getLength();
 					}
 					out.close();
+				} else if (receive[0] == 0 && receive[1] == 5){
+					System.out.println("Error in transmission is acknowlaged");
 				}
 			} catch (Exception e1) {
 				e1.printStackTrace();
