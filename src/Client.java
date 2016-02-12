@@ -167,48 +167,63 @@ public class Client {
 				byte[] receive = new byte[516];
 				DatagramPacket received = new DatagramPacket(receive, receive.length);
 				sendReceive.receive(received);
-				if (receive[0] == 0 && receive[1] == 4) { // Form write packet and send
-					BufferedInputStream input = new BufferedInputStream(new FileInputStream(file));
-					byte[] sendingData = new byte[512];
-					int x;
-					byte block = 1;
-					while ((x = input.read(sendingData)) != -1) {
-						byte[] sendingMessage = new byte[516];
-						sendingMessage[0] = 0;
-						sendingMessage[1] = 3;
-						sendingMessage[2] = 0;
-						sendingMessage[3] = block;
-						block++;
-						System.arraycopy(sendingData, 0, sendingMessage, 4, sendingData.length);
-						DatagramPacket fileTransfer = new DatagramPacket(sendingMessage, x + 4, InetAddress.getLocalHost(), received.getPort());
-						sendReceive.send(fileTransfer);
-						sendReceive.receive(received);
-					}
-					input.close();
-				} else if (receive[0] == 0 && receive[1] == 3) { // Form read packet and send
-					byte[] ack = new byte[4];
-					ack[0] = 0;
-					ack[1] = 4;
-					ack[2] = 0;
-					byte block = 0;
-					BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream("read.txt"));
-					out.write(receive, 4, received.getLength() - 4);
-					DatagramPacket acknowledge = new DatagramPacket(ack, 4, InetAddress.getLocalHost(), received.getPort());
-					sendReceive.send(acknowledge);
-					int x = received.getLength();
-					while (x == 516) {
-						ack[3] = block;
-						block++;
-						byte[] receiveFile = new byte[516];
-						DatagramPacket fileTransfer = new DatagramPacket(receiveFile, receiveFile.length);						
-						sendReceive.receive(fileTransfer);
-						out.write(receiveFile, 4, fileTransfer.getLength() - 4);
+				byte block;
+				int x;
+				if (isValid(received.getData(), (byte) 0, simulator.getClientPort())) {
+					switch (receive[1]) 
+					{
+					case (byte) 4: // Form write packet and send
+						BufferedInputStream input = new BufferedInputStream(new FileInputStream(file));
+						byte[] sendingData = new byte[512];
+						block = 1;
+						while ((x = input.read(sendingData)) != -1) {
+							byte[] sendingMessage = new byte[516];
+							sendingMessage[0] = 0;
+							sendingMessage[1] = 3;
+							sendingMessage[2] = 0;
+							sendingMessage[3] = block;
+							block++;
+							System.arraycopy(sendingData, 0, sendingMessage, 4, sendingData.length);
+							DatagramPacket fileTransfer = new DatagramPacket(sendingMessage, x + 4, InetAddress.getLocalHost(), received.getPort());
+							sendReceive.send(fileTransfer);
+							sendReceive.receive(received);
+							if (!isValid(received.getData(), block, received.getPort())) {
+								System.out.println("Packet recieved from host has an invalid Opcode, reporting back to Host");
+								error((byte)4, received.getPort());
+							}
+						}
+						input.close();
+						break;
+					case (byte) 3: // Form read packet and send
+						byte[] ack = new byte[4];
+						ack[0] = 0;
+						ack[1] = 4;
+						ack[2] = 0;
+						block = 0;
+						BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream("read.txt"));
+						out.write(receive, 4, received.getLength() - 4);
+						DatagramPacket acknowledge = new DatagramPacket(ack, 4, InetAddress.getLocalHost(), received.getPort());
 						sendReceive.send(acknowledge);
-						x = fileTransfer.getLength();
+						x = received.getLength();
+						while (x == 516) {
+							ack[3] = block;
+							block++;
+							byte[] receiveFile = new byte[516];
+							DatagramPacket fileTransfer = new DatagramPacket(receiveFile, receiveFile.length);						
+							sendReceive.receive(fileTransfer);
+							out.write(receiveFile, 4, fileTransfer.getLength() - 4);
+							sendReceive.send(acknowledge);
+							x = fileTransfer.getLength();
+						}
+						out.close();
+						break;
+					case (byte) 5:
+						System.out.println("Error in transmission is acknowlaged");
+						break;
 					}
-					out.close();
-				} else if (receive[0] == 0 && receive[1] == 5){
-					System.out.println("Error in transmission is acknowlaged");
+				}
+				else {
+					error((byte)4, simulator.getClientPort());
 				}
 			} catch (Exception e1) {
 				e1.printStackTrace();
@@ -216,6 +231,48 @@ public class Client {
 		}
 	}
 
+	/**
+	 * This method will check to ensure that the given packet data is a valid TFTP packet.
+	 * @param b the data of the received packet in the form of a byte array
+	 * @param block the block number specified by a DATA or ACK packet. Value negligible for WRQ or RRQ
+	 * @return true if the request is valid
+	 */
+	public boolean isValid(byte[] b, byte block, int port) {
+		//Initial checks to see if it is a valid packet
+		if (b == null || b.length == 0) {
+			return false;
+		} else if (b[0] != 0) {
+			return false;
+		}
+		switch (b[1]) {
+		case 3: case 4:
+			return (b[3] == block);
+		default: 
+			System.out.println("Packet recieved from host has an invalid Opcode, reporting back to Host");
+			error((byte)4, port);
+			return false;
+		}
+	}
+	
+	public void error(byte ErrorCode, int port){
+		DatagramSocket errorSimSocket;
+		byte[] receive = new byte[4];
+		DatagramPacket received = new DatagramPacket(receive, receive.length);
+		try {
+			errorSimSocket = new DatagramSocket();
+			byte[] connection = new byte[516];
+			connection[0] = (byte) 0;
+			connection[1] = (byte) 5;
+			connection[2] = (byte) 0;
+			connection[3] = (byte) ErrorCode;
+			DatagramPacket ErrorMessage = new DatagramPacket(connection, 516, InetAddress.getLocalHost(), port);
+			errorSimSocket.send(ErrorMessage);
+			errorSimSocket.receive(received);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
 	public static void main(String args[]) {
 		Client c = new Client();
 		c.runClient();

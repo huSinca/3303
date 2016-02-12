@@ -44,49 +44,54 @@ public class Server {
 	}
 
 	/**
-	 * This method will check to ensure that this is either a valid READ request 
-	 * or a WRITE request. Also this method will extract the filename and the mode of
-	 * the request and place them in the global variables of the server
-	 * @param b the byte array received from the intermediate host
+	 * This method will check to ensure that the given packet data is a valid TFTP packet. This method will
+	 * also extract the filename and the mode of a read or write request and place them in the global
+	 * variables of the server.
+	 * @param b the data of the received packet in the form of a byte array
+	 * @param block the block number specified by a DATA or ACK packet. Value negligible for WRQ or RRQ
 	 * @return true if the request is valid
 	 */
-	public boolean isValid(byte[] b, int port) {
-		//Initial checks to see if it is a valid read/write request
+	public boolean isValid(byte[] b, byte block, int port) {
+		//Initial checks to see if it is a valid packet
 		if (b == null || b.length == 0) {
 			return false;
 		} else if (b[0] != 0) {
-			System.out.println("1");
-			return false;
-		} else if (b[1] != 1 && b[1] != 2) {
-			System.out.println("Data recieved from host has an invalid Opcode, reporting back to Host");
-			error((byte)4, port);
 			return false;
 		}
-		//Get the filename from the byte array
-		StringBuilder builder = new StringBuilder();
-		int index;
-		for (index = 2; index < b.length; index++) {
-			if(b[index] != 0) {
-				builder.append((char) b[index]);
-			} else {
-				receivedFileName = builder.toString();
-				break;
+		switch (b[1]) {
+		case 1: case 2:
+			//Get the filename from the byte array
+			StringBuilder builder = new StringBuilder();
+			int index;
+			for (index = 2; index < b.length; index++) {
+				if(b[index] != 0) {
+					builder.append((char) b[index]);
+				} else {
+					receivedFileName = builder.toString();
+					break;
+				}
 			}
-		}
-		//Get the mode from the byte array
-		builder = new StringBuilder();
-		for (int i = index+1; i < b.length; i++) {
-			if(b[i] != 0) {
-				builder.append((char) b[i]);
-			} else {
-				receivedMode = builder.toString();
-				break;
+			//Get the mode from the byte array
+			builder = new StringBuilder();
+			for (int i = index+1; i < b.length; i++) {
+				if(b[i] != 0) {
+					builder.append((char) b[i]);
+				} else {
+					receivedMode = builder.toString();
+					break;
+				}
 			}
-		}
 
-		if (receivedMode != null && receivedFileName != null) {
-			return true;
-		} else {
+			if (receivedMode != null && receivedFileName != null) {
+				return true;
+			} else {
+				return false;
+			}
+		case 3: case 4:
+			return (b[3] == block);
+		default: 
+			System.out.println("Packet recieved from host has an invalid Opcode, reporting back to Host");
+			error((byte)4, port);
 			return false;
 		}
 	}
@@ -111,13 +116,20 @@ public class Server {
 				byte[] receiveFile = new byte[516];
 				establishPacket = new DatagramPacket(receiveFile, receiveFile.length);
 				errorSimSocket.receive(establishPacket);
-				out.write(receiveFile, 4, establishPacket.getLength() - 4);
-				DatagramPacket acknowledge = new DatagramPacket(connection, connection.length, 
-						InetAddress.getLocalHost(), establishPacket.getPort());
-				errorSimSocket.send(acknowledge);
-				if (establishPacket.getLength() < 516) break;
-				block++;
-				connection[3] = block;
+				if (!isValid(establishPacket.getData(), block, port)) {
+					System.out.println("1");
+					System.out.println("Packet recieved from host has an invalid Opcode, reporting back to Host");
+					error((byte)4, port);
+				}
+				else {
+					out.write(receiveFile, 4, establishPacket.getLength() - 4);
+					DatagramPacket acknowledge = new DatagramPacket(connection, connection.length, 
+							InetAddress.getLocalHost(), establishPacket.getPort());
+					errorSimSocket.send(acknowledge);
+					if (establishPacket.getLength() < 516) break;
+					block++;
+					connection[3] = block;
+				}
 			}
 			out.close();
 		} catch (Exception e) {
@@ -156,10 +168,8 @@ public class Server {
 
 	public void error(byte ErrorCode, int port){
 		DatagramSocket errorSimSocket;
-		byte block;
 		byte[] receive = new byte[4];
 		DatagramPacket received = new DatagramPacket(receive, receive.length);
-		block = 1;
 		try {
 			errorSimSocket = new DatagramSocket();
 			byte[] connection = new byte[516];
@@ -216,7 +226,7 @@ public class Server {
 				System.out.println("Waiting to Receive from Host");
 				receiveSocket.receive(receival);
 				int port = receival.getPort();
-				if (isValid(b,port)) {
+				if (isValid(b, (byte) 0, port)) {
 					new Thread(new Runnable() {
 						@Override
 						public void run() {
