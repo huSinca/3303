@@ -185,6 +185,7 @@ public class Client {
 				continue;
 			}
 
+			//Send read or write request
 			System.out.println("Sending following data to Server: ");
 			DatagramPacket p;
 			try {
@@ -192,10 +193,12 @@ public class Client {
 				printByteArray(request, request.length);
 				sendReceive.send(p);
 				
-				// Receive from ErrorSimulator
+				// Wait for response
 				byte[] receive = new byte[516];
 				DatagramPacket received = new DatagramPacket(receive, receive.length);
+				System.out.println("Waiting for a response...");
 				sendReceive.receive(received);
+				System.out.println("Received a response packet.");
 				//int receivePort = received.getPort();
 				byte block;
 				int x;
@@ -203,16 +206,16 @@ public class Client {
 					switch (receive[1]) 
 					{
 					case (byte) 4: // Form write packet and send
+						System.out.println("Forming write packet to send.");
 						BufferedInputStream input = new BufferedInputStream(new FileInputStream(file));
 						byte[] sendingData = new byte[512];
-						block = (byte) 1;
+						block = (byte) 0;
 						while ((x = input.read(sendingData)) != -1) {
 							byte[] sendingMessage = new byte[516];
 							sendingMessage[0] = (byte) 0;
 							sendingMessage[1] = (byte) 2;
 							sendingMessage[2] = (byte) 0;
 							sendingMessage[3] = block;
-							block++;
 							
 							System.arraycopy(sendingData, 0, sendingMessage, 4, sendingData.length);
 							DatagramPacket fileTransfer = new DatagramPacket(sendingMessage, x + 4, InetAddress.getLocalHost(), received.getPort());
@@ -222,14 +225,15 @@ public class Client {
 							sendReceive.send(fileTransfer);
 							sendReceive.receive(fileTransfer);
 							//fileTransfer = receivePacket(sendReceive, fileTransfer, received.getPort());
-							if (!isValid(received.getData(), block, received.getPort())) {
-								System.out.println("Packet recieved from host has an invalid Opcode, reporting back to Host");
+							if (!isValid(fileTransfer.getData(), block, fileTransfer.getPort())) {
 								error((byte) 4, received.getPort());
 							}
+							block++;
 						}
 						input.close();
 						break;
 					case (byte) 3: // Form read packet and send
+						System.out.println("Forming read packet to send.");
 						byte[] ack = new byte[4];
 						ack[0] = 0;
 						ack[1] = 4;
@@ -258,6 +262,7 @@ public class Client {
 					}
 				}
 				else {
+					System.out.println("Opcode error!");
 					error((byte)4, SERVERPORT);
 				}
 			} catch (Exception e1) {
@@ -275,15 +280,19 @@ public class Client {
 	public boolean isValid(byte[] b, byte block, int port) {
 		//Initial checks to see if it is a valid packet
 		if (b == null || b.length == 0) {
+			System.out.println("No packet data!");
 			return false;
 		} else if (b[0] != 0) {
+			System.out.println("Invalid opcode, does not start with 0!");
 			return false;
 		}
 		switch (b[1]) {
 		case 3: case 4:
+			System.out.println(block + " : " + b[3]);
+			System.out.println(b[3] == block);
 			return (b[3] == block);
 		default: 
-			System.out.println("Packet recieved from host has an invalid Opcode, reporting back to Host");
+			System.out.println("Invalid opcode!");
 			error((byte)4, port);
 			return false;
 		}

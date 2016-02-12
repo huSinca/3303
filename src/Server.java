@@ -3,6 +3,7 @@ import java.io.BufferedOutputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.StringBufferInputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -60,7 +61,7 @@ public class Server {
 			System.out.println("Invalid opcode, does not start with 0!");
 			return false;
 		}
-		System.out.println(b[1]);
+		System.out.println("Packet opcode: " + b[1]);
 		switch (b[1]) {
 		case (byte) 1: case (byte) 2:
 			//Get the filename from the byte array
@@ -108,7 +109,7 @@ public class Server {
 		connection[1] = (byte) 4;
 		connection[2] = (byte) 0;
 		connection[3] = (byte) 0;
-		block = 0;
+		block = (byte) 0;
 		try {
 			DatagramPacket establishPacket = new DatagramPacket(connection, connection.length, 
 					InetAddress.getLocalHost(), port);
@@ -120,8 +121,8 @@ public class Server {
 				byte[] receiveFile = new byte[516];
 				establishPacket = new DatagramPacket(receiveFile, receiveFile.length);
 				errorSimSocket.receive(establishPacket);
+				System.out.println("Received a packet.");
 				if (!isValid(establishPacket.getData(), block, port)) {
-					System.out.println("1");
 					System.out.println("Packet recieved from host has an invalid Opcode, reporting back to Host");
 					error((byte)4, port);
 				}
@@ -129,6 +130,7 @@ public class Server {
 					out.write(receiveFile, 4, establishPacket.getLength() - 4);
 					DatagramPacket acknowledge = new DatagramPacket(connection, connection.length, 
 							InetAddress.getLocalHost(), establishPacket.getPort());
+					System.out.println("Sending ACK packet.");
 					errorSimSocket.send(acknowledge);
 					if (establishPacket.getLength() < 516) break;
 					block++;
@@ -160,6 +162,7 @@ public class Server {
 				connection[3] = block;
 				System.arraycopy(sendingData, 0, connection, 4, sendingData.length);
 				DatagramPacket fileTransfer = new DatagramPacket(connection, x + 4, InetAddress.getLocalHost(), port);
+				System.out.println("Sending ACK packet.");
 				errorSimSocket.send(fileTransfer);
 				received = receivePacket(errorSimSocket, received, port);
 				block++;
@@ -182,6 +185,7 @@ public class Server {
 			connection[2] = (byte) 0;
 			connection[3] = (byte) ErrorCode;
 			DatagramPacket ErrorMessage = new DatagramPacket(connection, 516, InetAddress.getLocalHost(), port);
+			System.out.println("Sending ERROR packet.");
 			errorSimSocket.send(ErrorMessage);
 			received = receivePacket(errorSimSocket, received, port);
 		} catch (Exception e) {
@@ -203,10 +207,14 @@ public class Server {
 	private DatagramPacket receivePacket(DatagramSocket receiveSocket, DatagramPacket receivePacket, int port) throws IOException
 	{
 		receiveSocket.receive(receivePacket);
+		System.out.println("Received a packet!");
+		System.out.println("Expected TID: " + port);
+		System.out.println("Received TID: " + receivePacket.getPort());
 		//Ensure received packet came from the intended sender
 		while (receivePacket.getPort() != port) {
 			error((byte) 5, receivePacket.getPort());
 			receiveSocket.receive(receivePacket);
+			System.out.println("Received a packet.");
 		}
 		return receivePacket;
 	}
@@ -252,11 +260,13 @@ public class Server {
 				System.out.println("---------------------------------");
 				System.out.println("Waiting to Receive from Host");
 				receiveSocket.receive(receival);
+				System.out.println("Received a packet.");
 				int port = receival.getPort();
 				if (isValid(b, (byte) 0, port)) {
 					new Thread(new Runnable() {
 						@Override
 						public void run() {
+							System.out.println("New thread created.");
 							activeThreads.push(0);
 							if (b[1] == 1) {
 								read(b, port);
@@ -268,6 +278,7 @@ public class Server {
 								System.out.println("ERR");
 							}
 							activeThreads.pop();
+							System.out.println("A thread has completed execution.");
 						}
 					}).start();
 				} else {
