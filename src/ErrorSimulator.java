@@ -84,4 +84,9 @@ public class ErrorSimulator {
 			e.printStackTrace();
 		}
 	}
+	
+	public static void main(String args[])
+	{
+		ErrorSimulator es = new ErrorSimulator();
+	}
 }

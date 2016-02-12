@@ -27,7 +27,7 @@ public class Server {
 	 * The socket for the server which will be set to use port 69
 	 */
 	private DatagramSocket receiveSocket;
-
+	
 	private Stack<Integer> activeThreads = new Stack<Integer>();
 	
 	/**
@@ -54,12 +54,15 @@ public class Server {
 	public boolean isValid(byte[] b, byte block, int port) {
 		//Initial checks to see if it is a valid packet
 		if (b == null || b.length == 0) {
+			System.out.println("No packet data!");
 			return false;
 		} else if (b[0] != 0) {
+			System.out.println("Invalid opcode, does not start with 0!");
 			return false;
 		}
+		System.out.println(b[1]);
 		switch (b[1]) {
-		case 1: case 2:
+		case (byte) 1: case (byte) 2:
 			//Get the filename from the byte array
 			StringBuilder builder = new StringBuilder();
 			int index;
@@ -85,12 +88,13 @@ public class Server {
 			if (receivedMode != null && receivedFileName != null) {
 				return true;
 			} else {
+				System.out.println("Null file name or mode!");
 				return false;
 			}
-		case 3: case 4:
+		case (byte) 3: case (byte) 4:
 			return (b[3] == block);
 		default: 
-			System.out.println("Packet recieved from host has an invalid Opcode, reporting back to Host");
+			System.out.println("Invalid opcode!");
 			error((byte)4, port);
 			return false;
 		}
@@ -142,7 +146,7 @@ public class Server {
 		byte block;
 		byte[] receive = new byte[4];
 		DatagramPacket received = new DatagramPacket(receive, receive.length);
-		block = 1;
+		block = (byte) 1;
 		try {
 			errorSimSocket = new DatagramSocket();
 			byte[] sendingData = new byte[512];
@@ -157,7 +161,7 @@ public class Server {
 				System.arraycopy(sendingData, 0, connection, 4, sendingData.length);
 				DatagramPacket fileTransfer = new DatagramPacket(connection, x + 4, InetAddress.getLocalHost(), port);
 				errorSimSocket.send(fileTransfer);
-				errorSimSocket.receive(received);
+				received = receivePacket(errorSimSocket, received, port);
 				block++;
 			}
 			input.close();
@@ -179,11 +183,34 @@ public class Server {
 			connection[3] = (byte) ErrorCode;
 			DatagramPacket ErrorMessage = new DatagramPacket(connection, 516, InetAddress.getLocalHost(), port);
 			errorSimSocket.send(ErrorMessage);
-			errorSimSocket.receive(received);
+			received = receivePacket(errorSimSocket, received, port);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
+	
+	/**
+	 * Receives a packet from an intended sender specified by port. If the received packet is not from the
+	 * intended sender, the Server will respond to that sender with an ERROR packet, and then continue waiting for
+	 * a packet from the intended sender.
+	 * 
+	 * @param receiveSocket socket to receive from
+	 * @param receivePacket packet received
+	 * @param port port number of the intended sender
+	 * @return the received DatagramPacket
+	 * @throws IOException
+	 */
+	private DatagramPacket receivePacket(DatagramSocket receiveSocket, DatagramPacket receivePacket, int port) throws IOException
+	{
+		receiveSocket.receive(receivePacket);
+		//Ensure received packet came from the intended sender
+		while (receivePacket.getPort() != port) {
+			error((byte) 5, receivePacket.getPort());
+			receiveSocket.receive(receivePacket);
+		}
+		return receivePacket;
+	}
+	
 	/**
 	 * This method is used to run the Server
 	 * @throws Exception when an invalid request is received
@@ -234,16 +261,17 @@ public class Server {
 							if (b[1] == 1) {
 								read(b, port);
 								System.out.println("Read request recieved");
-							} else if (b[1] == 2){
+							} else if (b[1] == 2) {
 								write(b, port);
 								System.out.println("Write request recieved");
-							} else{
+							} else {
 								System.out.println("ERR");
 							}
 							activeThreads.pop();
 						}
 					}).start();
 				} else {
+					System.out.println("Not valid");
 					//do nothing;
 				}
 

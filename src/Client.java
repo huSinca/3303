@@ -3,6 +3,7 @@ import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -11,6 +12,8 @@ import javax.swing.JOptionPane;
 
 public class Client {
 
+	private static final int SERVERPORT = 69;
+	
 	/**
 	 * Type of mode the user has entered ("Read" or "Write")
 	 */
@@ -29,12 +32,16 @@ public class Client {
 	/** 
 	 * ErrorSimulator object created with client for future iterations
 	 */
-	private ErrorSimulator simulator;
+	//private ErrorSimulator simulator;
+	
+	/**
+	 * True if the client is in test mode (ie. sending to the error simulator instead of the server
+	 */
+	private boolean testMode;
 	
 	public Client() {
 		try {
 			sendReceive = new DatagramSocket();
-			simulator = new ErrorSimulator();
 		} catch (SocketException e) {
 			e.printStackTrace();
 		}
@@ -50,9 +57,8 @@ public class Client {
 	 */
 	public static void printByteArray(byte[] array, int length) {
 		for (int j = 0; j < length; j++) {
-			System.out.print(array[j]);
+			System.out.println("Byte " + j + ": " + array[j]);
 		}
-		System.out.println();
 		System.out.println(new String(array, 0, length));
 	}
 
@@ -78,7 +84,7 @@ public class Client {
 		b[0] = (byte) 0;
 		b[1] = (byte) 1;
 		if (requestType.equals("Write"))
-			b[1] = 2;
+			b[1] = (byte) 2;
 		System.arraycopy(fileName.getBytes(), 0, b, 2, fileName.length());
 		b[fileName.length() + 2] = 0;
 		System.arraycopy(mode.getBytes(), 0, b, fileName.length() + 3, mode.length());
@@ -129,7 +135,32 @@ public class Client {
 			
 		}
 	}
-
+	
+	/**
+	 * Receives a packet from an intended sender specified by port. If the received packet is not from the
+	 * intended sender, the Server will respond to that sender with an ERROR packet, and then continue waiting for
+	 * a packet from the intended sender.
+	 * 
+	 * @param receiveSocket socket to receive from
+	 * @param receivePacket packet received
+	 * @param port port number of the intended sender
+	 * @return the received DatagramPacket
+	 * @throws IOException
+	 */
+	private DatagramPacket receivePacket(DatagramSocket receiveSocket, DatagramPacket receivePacket, int port) throws IOException
+	{
+		receiveSocket.receive(receivePacket);
+		System.out.println("Received a packet!");
+		System.out.println("Expected TID: " + port);
+		System.out.println("Received TID: " + receivePacket.getPort());
+		//Ensure received packet came from the intended sender
+		while (receivePacket.getPort() != port) {
+			error((byte) 5, receivePacket.getPort());
+			receiveSocket.receive(receivePacket);
+		}
+		return receivePacket;
+	}
+	
 	/**
 	 * This method is used to run the Client
 	 * - Calls UI to prompt user for mode type and file name
@@ -154,12 +185,10 @@ public class Client {
 				continue;
 			}
 
-			System.out.println("Sending following data to port Error Simulator: ");
+			System.out.println("Sending following data to Server: ");
 			DatagramPacket p;
 			try {
-				// send to ErrorSimulator
-				simulator = new ErrorSimulator();
-				p = new DatagramPacket(request, request.length, InetAddress.getLocalHost(), simulator.getClientPort());
+				p = new DatagramPacket(request, request.length, InetAddress.getLocalHost(), SERVERPORT);
 				printByteArray(request, request.length);
 				sendReceive.send(p);
 				
@@ -167,29 +196,35 @@ public class Client {
 				byte[] receive = new byte[516];
 				DatagramPacket received = new DatagramPacket(receive, receive.length);
 				sendReceive.receive(received);
+				//int receivePort = received.getPort();
 				byte block;
 				int x;
-				if (isValid(received.getData(), (byte) 0, simulator.getClientPort())) {
+				if (isValid(received.getData(), (byte) 0, SERVERPORT)) {
 					switch (receive[1]) 
 					{
 					case (byte) 4: // Form write packet and send
 						BufferedInputStream input = new BufferedInputStream(new FileInputStream(file));
 						byte[] sendingData = new byte[512];
-						block = 1;
+						block = (byte) 1;
 						while ((x = input.read(sendingData)) != -1) {
 							byte[] sendingMessage = new byte[516];
-							sendingMessage[0] = 0;
-							sendingMessage[1] = 3;
-							sendingMessage[2] = 0;
+							sendingMessage[0] = (byte) 0;
+							sendingMessage[1] = (byte) 2;
+							sendingMessage[2] = (byte) 0;
 							sendingMessage[3] = block;
 							block++;
+							
 							System.arraycopy(sendingData, 0, sendingMessage, 4, sendingData.length);
 							DatagramPacket fileTransfer = new DatagramPacket(sendingMessage, x + 4, InetAddress.getLocalHost(), received.getPort());
+							System.out.println("Sending following data to Server: ");
+							printByteArray(sendingMessage, sendingMessage.length);
+							
 							sendReceive.send(fileTransfer);
-							sendReceive.receive(received);
+							sendReceive.receive(fileTransfer);
+							//fileTransfer = receivePacket(sendReceive, fileTransfer, received.getPort());
 							if (!isValid(received.getData(), block, received.getPort())) {
 								System.out.println("Packet recieved from host has an invalid Opcode, reporting back to Host");
-								error((byte)4, received.getPort());
+								error((byte) 4, received.getPort());
 							}
 						}
 						input.close();
@@ -210,7 +245,7 @@ public class Client {
 							block++;
 							byte[] receiveFile = new byte[516];
 							DatagramPacket fileTransfer = new DatagramPacket(receiveFile, receiveFile.length);						
-							sendReceive.receive(fileTransfer);
+							fileTransfer = receivePacket(sendReceive, fileTransfer, received.getPort());
 							out.write(receiveFile, 4, fileTransfer.getLength() - 4);
 							sendReceive.send(acknowledge);
 							x = fileTransfer.getLength();
@@ -223,7 +258,7 @@ public class Client {
 					}
 				}
 				else {
-					error((byte)4, simulator.getClientPort());
+					error((byte)4, SERVERPORT);
 				}
 			} catch (Exception e1) {
 				e1.printStackTrace();
@@ -267,7 +302,7 @@ public class Client {
 			connection[3] = (byte) ErrorCode;
 			DatagramPacket ErrorMessage = new DatagramPacket(connection, 516, InetAddress.getLocalHost(), port);
 			errorSimSocket.send(ErrorMessage);
-			errorSimSocket.receive(received);
+			//received = receivePacket(errorSimSocket, received, port);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
