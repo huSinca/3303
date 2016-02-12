@@ -104,6 +104,7 @@ public class Server {
 	public void write(byte[] receivedPacket, int port) {
 		DatagramSocket errorSimSocket;
 		byte block;
+		//Create data for an ACK packet
 		byte[] connection = new byte[4];
 		connection[0] = (byte) 0;
 		connection[1] = (byte) 4;
@@ -114,6 +115,7 @@ public class Server {
 			DatagramPacket establishPacket = new DatagramPacket(connection, connection.length, 
 					InetAddress.getLocalHost(), port);
 			errorSimSocket = new DatagramSocket();
+			//Send ACK packet
 			errorSimSocket.send(establishPacket);
 
 			BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream("write.txt"));
@@ -162,7 +164,7 @@ public class Server {
 				connection[3] = block;
 				System.arraycopy(sendingData, 0, connection, 4, sendingData.length);
 				DatagramPacket fileTransfer = new DatagramPacket(connection, x + 4, InetAddress.getLocalHost(), port);
-				System.out.println("Sending ACK packet.");
+				System.out.println("Sending DATA packet.");
 				errorSimSocket.send(fileTransfer);
 				received = receivePacket(errorSimSocket, received, port);
 				block++;
@@ -259,6 +261,8 @@ public class Server {
 			while (true) {
 				System.out.println("---------------------------------");
 				System.out.println("Waiting to Receive from Host");
+				
+				//Server receives a read or write request
 				receiveSocket.receive(receival);
 				System.out.println("Received a packet.");
 				int port = receival.getPort();
@@ -269,11 +273,11 @@ public class Server {
 							System.out.println("New thread created.");
 							activeThreads.push(0);
 							if (b[1] == 1) {
-								read(b, port);
 								System.out.println("Read request recieved");
+								read(b, port);
 							} else if (b[1] == 2) {
-								write(b, port);
 								System.out.println("Write request recieved");
+								write(b, port);
 							} else {
 								System.out.println("ERR");
 							}

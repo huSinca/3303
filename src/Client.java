@@ -199,14 +199,14 @@ public class Client {
 				System.out.println("Waiting for a response...");
 				sendReceive.receive(received);
 				System.out.println("Received a response packet.");
-				//int receivePort = received.getPort();
+				byte rw = (receive[1] == (byte) 4) ? (byte) 0 : (byte) 1;
 				byte block;
 				int x;
-				if (isValid(received.getData(), (byte) 0, SERVERPORT)) {
+				if (isValid(received.getData(), rw, SERVERPORT)) {
 					switch (receive[1]) 
 					{
-					case (byte) 4: // Form write packet and send
-						System.out.println("Forming write packet to send.");
+					case (byte) 4:
+						System.out.println("Forming write request packet to send.");
 						BufferedInputStream input = new BufferedInputStream(new FileInputStream(file));
 						byte[] sendingData = new byte[512];
 						block = (byte) 0;
@@ -232,8 +232,8 @@ public class Client {
 						}
 						input.close();
 						break;
-					case (byte) 3: // Form read packet and send
-						System.out.println("Forming read packet to send.");
+					case (byte) 3:
+						System.out.println("Forming read request packet to send.");
 						byte[] ack = new byte[4];
 						ack[0] = 0;
 						ack[1] = 4;
@@ -250,7 +250,8 @@ public class Client {
 							byte[] receiveFile = new byte[516];
 							DatagramPacket fileTransfer = new DatagramPacket(receiveFile, receiveFile.length);						
 							fileTransfer = receivePacket(sendReceive, fileTransfer, received.getPort());
-							out.write(receiveFile, 4, fileTransfer.getLength() - 4);
+							printByteArray(fileTransfer.getData(), fileTransfer.getLength());
+							out.write(receiveFile, 3, fileTransfer.getLength() - 4);
 							sendReceive.send(acknowledge);
 							x = fileTransfer.getLength();
 						}
@@ -262,7 +263,7 @@ public class Client {
 					}
 				}
 				else {
-					System.out.println("Opcode error!");
+					System.out.println("Request response not valid!");
 					error((byte)4, SERVERPORT);
 				}
 			} catch (Exception e1) {
@@ -288,8 +289,6 @@ public class Client {
 		}
 		switch (b[1]) {
 		case 3: case 4:
-			System.out.println(block + " : " + b[3]);
-			System.out.println(b[3] == block);
 			return (b[3] == block);
 		default: 
 			System.out.println("Invalid opcode!");
