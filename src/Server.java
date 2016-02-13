@@ -3,7 +3,6 @@ import java.io.BufferedOutputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.StringBufferInputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -27,7 +26,7 @@ public class Server {
 	/**
 	 * The socket for the server which will be set to use port 69
 	 */
-	private DatagramSocket receiveSocket;
+	private DatagramSocket transferSocket;
 	
 	private Stack<Integer> activeThreads = new Stack<Integer>();
 	
@@ -38,7 +37,7 @@ public class Server {
 
 	public Server() {
 		try {
-			receiveSocket = new DatagramSocket(69);
+			transferSocket = new DatagramSocket(69);
 		} catch (SocketException e) {
 			e.printStackTrace();
 		}
@@ -50,7 +49,8 @@ public class Server {
 	 * variables of the server.
 	 * @param b the data of the received packet in the form of a byte array
 	 * @param block the block number specified by a DATA or ACK packet. Value negligible for WRQ or RRQ
-	 * @return true if the request is valid
+	 * @param port the port number of the intended sender. Used to determine unknown transfer ID errors
+	 * @return true if the packet is valid
 	 */
 	public boolean isValid(byte[] b, byte block, int port) {
 		//Initial checks to see if it is a valid packet
@@ -63,6 +63,7 @@ public class Server {
 		}
 		System.out.println("Packet opcode: " + b[1]);
 		switch (b[1]) {
+		//If the packet is a WRQ or RRQ
 		case (byte) 1: case (byte) 2:
 			//Get the filename from the byte array
 			StringBuilder builder = new StringBuilder();
@@ -85,25 +86,33 @@ public class Server {
 					break;
 				}
 			}
-
 			if (receivedMode != null && receivedFileName != null) {
 				return true;
 			} else {
 				System.out.println("Null file name or mode!");
 				return false;
 			}
+		//If the packet is a DATA or ACK
 		case (byte) 3: case (byte) 4:
 			return (b[3] == block);
+		//If the packet is an ERROR
+		case (byte) 5:
+			System.out.println("ERROR packet acknowledged.");
+			return true;
 		default: 
 			System.out.println("Invalid opcode!");
-			error((byte)4, port);
 			return false;
 		}
 	}
 
+	/**
+	 * Handles write operations.
+	 * @param receivedPacket data held in the write request
+	 * @param port port number from which the write request came
+	 */
 	public void write(byte[] receivedPacket, int port) {
-		DatagramSocket errorSimSocket;
-		byte block;
+		DatagramSocket transferSocket;	//Socket through which the transfer is done
+		byte block;	//The current block of data being transferred
 		//Create data for an ACK packet
 		byte[] connection = new byte[4];
 		connection[0] = (byte) 0;
@@ -114,15 +123,15 @@ public class Server {
 		try {
 			DatagramPacket establishPacket = new DatagramPacket(connection, connection.length, 
 					InetAddress.getLocalHost(), port);
-			errorSimSocket = new DatagramSocket();
+			transferSocket = new DatagramSocket();
 			//Send ACK packet
-			errorSimSocket.send(establishPacket);
+			transferSocket.send(establishPacket);
 
 			BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream("write.txt"));
 			while(true) {
 				byte[] receiveFile = new byte[516];
 				establishPacket = new DatagramPacket(receiveFile, receiveFile.length);
-				errorSimSocket.receive(establishPacket);
+				transferSocket.receive(establishPacket);
 				System.out.println("Received a packet.");
 				if (!isValid(establishPacket.getData(), block, port)) {
 					System.out.println("Packet recieved from host has an invalid Opcode, reporting back to Host");
@@ -133,10 +142,11 @@ public class Server {
 					DatagramPacket acknowledge = new DatagramPacket(connection, connection.length, 
 							InetAddress.getLocalHost(), establishPacket.getPort());
 					System.out.println("Sending ACK packet.");
-					errorSimSocket.send(acknowledge);
+					transferSocket.send(acknowledge);
+					//A packet of less than max size indicates the end of the transfer
 					if (establishPacket.getLength() < 516) break;
 					block++;
-					connection[3] = block;
+					connection[3] = block;	//Update block field in the packet
 				}
 			}
 			out.close();
@@ -145,28 +155,35 @@ public class Server {
 		}
 	}
 
+	/**
+	 * Handles read operations
+	 * @param receivedPacket data held in the read request
+	 * @param portport number from which the read request came
+	 */
 	public void read(byte[] receivedPacket, int port) {
-		DatagramSocket errorSimSocket;
-		byte block;
-		byte[] receive = new byte[4];
-		DatagramPacket received = new DatagramPacket(receive, receive.length);
+		DatagramSocket transferSocket;	//Socket through which the transfer is done
+		byte block;	//The current block of data being transferred
+		byte[] receive = new byte[4];	//Buffer for incoming packets
+		DatagramPacket received = new DatagramPacket(receive, receive.length);	//Holds incoming packets
 		block = (byte) 1;
 		try {
-			errorSimSocket = new DatagramSocket();
+			transferSocket = new DatagramSocket();
 			byte[] sendingData = new byte[512];
 			BufferedInputStream input = new BufferedInputStream(new FileInputStream(receivedFileName));
-			int x;
+			int x;	//End of stream indicator
 			while ((x = input.read(sendingData)) != -1) {
-				byte[] connection = new byte[516];
+				byte[] connection = new byte[516];	//Buffer for outgoing packets
 				connection[0] = (byte) 0;
 				connection[1] = (byte) 3;
 				connection[2] = (byte) 0;
 				connection[3] = block;
 				System.arraycopy(sendingData, 0, connection, 4, sendingData.length);
 				DatagramPacket fileTransfer = new DatagramPacket(connection, x + 4, InetAddress.getLocalHost(), port);
-				System.out.println("Sending DATA packet.");
-				errorSimSocket.send(fileTransfer);
-				received = receivePacket(errorSimSocket, received, port);
+				do {
+					System.out.println("Sending DATA packet.");
+					transferSocket.send(fileTransfer);
+					received = receivePacket(transferSocket, received, port);
+				} while (received.getData()[1] == (byte) 5);	//Re-send if an ERROR is received
 				block++;
 			}
 			input.close();
@@ -175,12 +192,15 @@ public class Server {
 		}
 	}
 
+	/**
+	 * Sends an ERROR packet.
+	 * @param ErrorCode TFTP error code of the ERROR packet
+	 * @param port port to send the packet through
+	 */
 	public void error(byte ErrorCode, int port){
-		DatagramSocket errorSimSocket;
-		byte[] receive = new byte[4];
-		DatagramPacket received = new DatagramPacket(receive, receive.length);
+		DatagramSocket transferSocket;	//Socket to be sent through
 		try {
-			errorSimSocket = new DatagramSocket();
+			transferSocket = new DatagramSocket();
 			byte[] connection = new byte[516];
 			connection[0] = (byte) 0;
 			connection[1] = (byte) 5;
@@ -188,55 +208,69 @@ public class Server {
 			connection[3] = (byte) ErrorCode;
 			DatagramPacket ErrorMessage = new DatagramPacket(connection, 516, InetAddress.getLocalHost(), port);
 			System.out.println("Sending ERROR packet.");
-			errorSimSocket.send(ErrorMessage);
-			received = receivePacket(errorSimSocket, received, port);
+			transferSocket.send(ErrorMessage);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
 	
 	/**
-	 * Receives a packet from an intended sender specified by port. If the received packet is not from the
-	 * intended sender, the Server will respond to that sender with an ERROR packet, and then continue waiting for
-	 * a packet from the intended sender.
+	 * Receives a packet from an intended sender specified by port. If the received packet is invalid (ie it is not
+	 * from the intended sender, or it has an invalid opcode), the program will respond by sending an appropriate
+	 * ERROR packet. It then continues waiting for a packet.
 	 * 
-	 * @param receiveSocket socket to receive from
+	 * @param transferSocket socket to receive from
 	 * @param receivePacket packet received
 	 * @param port port number of the intended sender
 	 * @return the received DatagramPacket
 	 * @throws IOException
 	 */
-	private DatagramPacket receivePacket(DatagramSocket receiveSocket, DatagramPacket receivePacket, int port) throws IOException
+	private DatagramPacket receivePacket(DatagramSocket transferSocket, DatagramPacket receivePacket, int port)
 	{
-		receiveSocket.receive(receivePacket);
-		System.out.println("Received a packet!");
-		System.out.println("Expected TID: " + port);
-		System.out.println("Received TID: " + receivePacket.getPort());
-		//Ensure received packet came from the intended sender
-		while (receivePacket.getPort() != port) {
-			error((byte) 5, receivePacket.getPort());
-			receiveSocket.receive(receivePacket);
-			System.out.println("Received a packet.");
+		boolean error = true;	//Indicates whether or not an invalid packet has been received and the server
+								//must continue waiting
+		try {
+			while(error) {
+				error = false;
+				System.out.println("Waiting for a packet...");
+				transferSocket.receive(receivePacket);
+				System.out.println("Received a packet!");
+				System.out.println("Expected TID: " + port);
+				System.out.println("Received TID: " + receivePacket.getPort());
+				//Ensure received packet is a valid TFTP operation
+				if (!isValid(receivePacket.getData(), receivePacket.getData()[3], port)) {
+					System.out.println("Error, illegal TFTP operation!");
+					error((byte) 4, receivePacket.getPort());
+					error = true;
+				}
+				//Ensure received packet came from the intended sender
+				if (receivePacket.getPort() != port) {
+					System.out.println("Error, unknown transfer ID");
+					error((byte) 5, receivePacket.getPort());
+					error = true;
+				}
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
 		return receivePacket;
 	}
 	
 	/**
 	 * This method is used to run the Server
-	 * @throws Exception when an invalid request is received
 	 */
-	public void runServer() throws Exception {
+	public void runServer()
+	{
 		byte[] b = new byte[100];
 		DatagramPacket receival = new DatagramPacket(b, b.length);
 		
 		/**
 		 * Thread created to launch prompt for server shutdown.
 		 * Thread is required as server could become blocked
-		 * with the receiveSocket.receive(receival) call as it will
+		 * with the transferSocket.receive(receival) call as it will
 		 * wait to receive rather than quit. The thread ensures
 		 * that as long as no requests come in or no requests
-		 * are currently running, it will quit override and
-		 * quit.
+		 * are currently running, it will override and quit.
 		 */
 		new Thread(new Runnable() {
 			@Override
@@ -263,7 +297,7 @@ public class Server {
 				System.out.println("Waiting to Receive from Host");
 				
 				//Server receives a read or write request
-				receiveSocket.receive(receival);
+				transferSocket.receive(receival);
 				System.out.println("Received a packet.");
 				int port = receival.getPort();
 				if (isValid(b, (byte) 0, port)) {
