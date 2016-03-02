@@ -207,7 +207,7 @@ public class Server {
 			connection[2] = (byte) 0;
 			connection[3] = (byte) ErrorCode;
 			DatagramPacket ErrorMessage = new DatagramPacket(connection, 516, InetAddress.getLocalHost(), port);
-			System.out.println("Sending ERROR packet.");
+			System.out.println("Sending ERROR(From Server) packet.");
 			transferSocket.send(ErrorMessage);
 		} catch (Exception e) {
 			e.printStackTrace();

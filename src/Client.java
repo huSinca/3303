@@ -319,6 +319,7 @@ public class Client {
 						ack[1] = 4;
 						ack[2] = 0;
 						block = 0; //The current block of data being transferred
+						block++;
 						BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream("read.txt"));
 						out.write(receive, 4, received.getLength() - 4);
 						DatagramPacket acknowledge = new DatagramPacket(ack, 4, InetAddress.getLocalHost(), received.getPort());
