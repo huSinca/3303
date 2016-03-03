@@ -1,3 +1,4 @@
+package Client;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -265,7 +266,7 @@ public class Client {
 			DatagramPacket p;
 			try {
 				p = new DatagramPacket(request, request.length, InetAddress.getLocalHost(), sendPort);
-				printByteArray(request, request.length);
+				System.out.println("Sending Request");
 				sendReceive.send(p);
 				
 				// Wait for response
@@ -285,7 +286,7 @@ public class Client {
 						System.out.println("Forming DATA packet to send.");
 						BufferedInputStream input = new BufferedInputStream(new FileInputStream(file));
 						byte[] sendingData = new byte[512];
-						block = (byte) 0; //The current block of data being transferred
+						block = (byte) 1; //The current block of data being transferred
 						while ((x = input.read(sendingData)) != -1) {
 							byte[] sendingMessage = new byte[516];
 							sendingMessage[0] = (byte) 0;
@@ -297,10 +298,8 @@ public class Client {
 							DatagramPacket fileTransfer = new DatagramPacket(sendingMessage, x + 4, InetAddress.getLocalHost(), received.getPort());
 							
 							do {
-								System.out.println("Sending following data to Server: ");
-								printByteArray(sendingMessage, sendingMessage.length);
+								System.out.println("Sending following Data to Server ");
 								sendReceive.send(fileTransfer);
-								//sendReceive.receive(fileTransfer);
 								fileTransfer = receivePacket(sendReceive, fileTransfer, received.getPort());
 							} while (fileTransfer.getData()[1] == (byte) 5);	//Re-send if an ERROR is received
 							//Send an ERROR if a received packet is invalid
@@ -333,8 +332,7 @@ public class Client {
 							DatagramPacket fileTransfer = new DatagramPacket(receiveFile, receiveFile.length);
 							System.out.println("Waiting for DATA from server...");
 							fileTransfer = receivePacket(sendReceive, fileTransfer, received.getPort());
-							System.out.println("Received packet from server! Contents:");
-							printByteArray(fileTransfer.getData(), fileTransfer.getLength());
+							System.out.println("Received packet from server!");
 							out.write(receiveFile, 3, fileTransfer.getLength() - 4);
 							System.out.println("Sending ACK packet back to server");
 							sendReceive.send(acknowledge);
@@ -355,6 +353,14 @@ public class Client {
 				e1.printStackTrace();
 			}
 		}
+	}
+	
+	public void sendFile() {
+		
+	}
+	
+	public void receiveFile() {
+		
 	}
 	
 	public static void main(String args[]) {

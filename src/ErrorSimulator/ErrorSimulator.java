@@ -1,3 +1,4 @@
+package ErrorSimulator;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -16,7 +17,7 @@ public class ErrorSimulator extends Thread {
 
 	private DatagramSocket newClientSocket;
 
-	private Errors errorType;
+	private Errors errorType = Errors.NORMAL_MODE;
 
 	private String packetToPerform;
 
@@ -213,12 +214,37 @@ public class ErrorSimulator extends Thread {
 					simulateError5(p, sendPort);
 				} else if (errorType.equals(Errors.ILLEGAL_TFTP_OP)) {
 					simulateError4(p, sendPort);
+				} else if (errorType.equals(Errors.DELAY_PACKET)) {
+					simulateDelay(p, sendPort);
+				} else if (errorType.equals(Errors.DUPLICATE_PACKET)) {
+					simulateDuplication(p, sendPort);
+				} else if (errorType.equals(Errors.LOSE_PACKET)) {
+					simulateLoss(p, sendPort);
 				}
 			}
 		}
 	}
+	
+	private void simulateDelay(DatagramPacket p, int sendPort) {
+		System.out.println("-------------------------------------");
+		System.out.println("Packet Delay Simulation");
+		System.out.println("-------------------------------------");
+	}
+	
+	public void simulateDuplication(DatagramPacket p, int sendPort) {
+		System.out.println("-------------------------------------");
+		System.out.println("Packet Duplication Simulation");
+		System.out.println("-------------------------------------");
+	}
+	
+	public void simulateLoss(DatagramPacket p, int sendPort) {
+		System.out.println("-------------------------------------");
+		System.out.println("Packet Loss Simulation");
+		System.out.println("-------------------------------------");
+	}
 
 	private void simulateError4(DatagramPacket p, int sendPort) {
+		System.out.println("------------------------------------------------");
 		System.out.println("Invalid TFTP Operation Simulation (Error Code 4)");
 		String first, second;
 		DatagramSocket firstSocket, secondSocket;
@@ -238,7 +264,6 @@ public class ErrorSimulator extends Thread {
 			secondSocket = serverSocket;
 			secondPort = server;
 		}
-		
 		byte[] b = createFalsePacket(p);
 		try {
 			System.out.println("Sending Invalid packet to " + first);
@@ -249,14 +274,16 @@ public class ErrorSimulator extends Thread {
 			System.out.println("Sending " + packetInfo(packet) + " to " + second);
 			p.setPort(secondPort);
 			secondSocket.send(packet);
-			//secondSocket.receive(packet);
+			secondSocket.receive(packet);
 			System.out.println("Received " + packetInfo(packet) + "from " + second);
+			System.out.println("---------------------------------------------------");
 		} catch (IOException e) {
 			e.printStackTrace();
 		}		
 	}
 
 	private void simulateError5(DatagramPacket p, int sendPort) {
+		System.out.println("-------------------------------------");
 		System.out.println("Invalid TID Simulation (Error Code 5)");
 		try {
 			String first, second;
@@ -286,6 +313,7 @@ public class ErrorSimulator extends Thread {
 			receive = new DatagramPacket(b, 516);
 			TIDErrorSocket.receive(receive);
 			System.out.println("Received a " + packetToPerform + "from " + second);
+			System.out.println("-------------------------------------");
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -299,24 +327,30 @@ public class ErrorSimulator extends Thread {
 			serverSocket = new DatagramSocket();
 			newClientSocket = new DatagramSocket();
 			clientSocket.receive(receival);
+			System.out.println("Received " + packetInfo(receival) + " packet from Client");
 			client = receival.getPort();
 			DatagramPacket send = new DatagramPacket(b, receival.getLength(), InetAddress.getLocalHost(), 69);
 			checkPacket(receival, server);
+			System.out.println("Sending " + packetInfo(receival) + " packet to Server");
 			serverSocket.send(send);
-			while (true) {				
+			while (true) {		
 				byte[] serverReceival = new byte[516];
 				DatagramPacket receiveFromServer = new DatagramPacket(serverReceival, serverReceival.length);
 				serverSocket.receive(receiveFromServer);
+				System.out.println("Received " + packetInfo(receiveFromServer) + " packet from Server");
 				server = receiveFromServer.getPort();
 				checkPacket(receiveFromServer, client);
 				DatagramPacket sendClientPacket = new DatagramPacket(serverReceival, receiveFromServer.getLength(), InetAddress.getLocalHost(), receival.getPort());
+				System.out.println("Sending " + packetInfo(sendClientPacket) + " packet to Client");
 				newClientSocket.send(sendClientPacket);
 
 				byte[] clientReceival = new byte[516];
 				DatagramPacket receiveClientPacket = new DatagramPacket(clientReceival, clientReceival.length);
 				newClientSocket.receive(receiveClientPacket); 
+				System.out.println("Received " + packetInfo(receiveClientPacket) + " packet from Client");
 				checkPacket(receiveClientPacket, server);
 				DatagramPacket sendServer = new DatagramPacket(clientReceival, receiveClientPacket.getLength(), InetAddress.getLocalHost(), receiveFromServer.getPort());
+				System.out.println("Sending " + packetInfo(sendServer) + " packet to Server");
 				serverSocket.send(sendServer);
 			}
 		}catch (Exception e) {
@@ -346,6 +380,12 @@ public class ErrorSimulator extends Thread {
 				es.errorType = Errors.INVALID_TID;
 			} else if (input.equals(Errors.ILLEGAL_TFTP_OP.toString())) {
 				es.errorType = Errors.ILLEGAL_TFTP_OP;
+			} else if (input.equals(Errors.DELAY_PACKET.toString())) {
+				es.errorType = Errors.DELAY_PACKET;
+			} else if (input.equals(Errors.DUPLICATE_PACKET.toString())) {
+				es.errorType = Errors.DUPLICATE_PACKET;
+			} else if (input.equals(Errors.LOSE_PACKET.toString())) {
+				es.errorType = Errors.LOSE_PACKET;
 			} else {
 				System.out.println("The command that you have entered is not valid. Enter \"commands\" to see all valid commands");
 				continue;
