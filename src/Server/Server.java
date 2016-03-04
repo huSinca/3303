@@ -1,3 +1,4 @@
+package Server;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.FileInputStream;
@@ -7,7 +8,9 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.util.Scanner;
 import java.util.Stack;
+
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 
@@ -207,7 +210,7 @@ public class Server {
 			connection[2] = (byte) 0;
 			connection[3] = (byte) ErrorCode;
 			DatagramPacket ErrorMessage = new DatagramPacket(connection, 516, InetAddress.getLocalHost(), port);
-			System.out.println("Sending ERROR packet.");
+			System.out.println("Sending ERROR(From Server) packet.");
 			transferSocket.send(ErrorMessage);
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -279,13 +282,18 @@ public class Server {
 				int close;
 				while (true) { // run till shutdown requested
 					if(!shutdown) {
-						close = JOptionPane.showConfirmDialog(null, modeLabel, "Warning", JOptionPane.CLOSED_OPTION);
-						if (close == 0) { // ok has been selected, set shutdown to true
+						System.out.print("Enter quit to shutdown the Server: ");
+						String input = new Scanner(System.in).nextLine().toLowerCase();
+						if (input.equals("quit")) {
 							shutdown = true;
 						}
+//						close = JOptionPane.showConfirmDialog(null, modeLabel, "Warning", JOptionPane.CLOSED_OPTION);
+//						if (close == 0) { // ok has been selected, set shutdown to true
+//							shutdown = true;
+//						}
 					}
 					else if (shutdown && activeThreads.isEmpty()) { // wait till all active threads finish & shutdown requested
-						System.out.println("Shutting server down");
+						System.out.println("Server has shut down");
 						System.exit(0);
 					}
 				}
