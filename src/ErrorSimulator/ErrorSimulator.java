@@ -393,7 +393,7 @@ public class ErrorSimulator extends Thread {
 					}
 					boolean errorSet = false;
 					while(!errorSet) {
-						System.out.println("Enter New Command (Enter \"commands\" for list of commands):");
+						System.out.println("Enter Error Command (Enter \"commands\" for list of commands):");
 						String input = userInput.nextLine().toLowerCase();
 						if (input.equals("commands")) {
 							es.displayPossibleCommands();
