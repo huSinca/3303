@@ -1,6 +1,7 @@
 package Server;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -12,10 +13,14 @@ import java.util.Scanner;
 import java.util.Stack;
 
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 
 public class Server {
-	
+
+	/**
+	 * The path where the server will Read/Write
+	 */
+	private String path;
+
 	/**
 	 * The name of the file received from the request from the intermediate host
 	 */
@@ -30,9 +35,9 @@ public class Server {
 	 * The socket for the server which will be set to use port 69
 	 */
 	private DatagramSocket transferSocket;
-	
+
 	private Stack<Integer> activeThreads = new Stack<Integer>();
-	
+
 	/**
 	 *  Shutdown flag to show if shutdown has been requested
 	 */
@@ -70,38 +75,38 @@ public class Server {
 		case (byte) 1: case (byte) 2:
 			//Get the filename from the byte array
 			StringBuilder builder = new StringBuilder();
-			int index;
-			for (index = 2; index < b.length; index++) {
-				if(b[index] != 0) {
-					builder.append((char) b[index]);
-				} else {
-					receivedFileName = builder.toString();
-					break;
-				}
-			}
-			//Get the mode from the byte array
-			builder = new StringBuilder();
-			for (int i = index+1; i < b.length; i++) {
-				if(b[i] != 0) {
-					builder.append((char) b[i]);
-				} else {
-					receivedMode = builder.toString();
-					break;
-				}
-			}
-			if (receivedMode != null && receivedFileName != null) {
-				return true;
+		int index;
+		for (index = 2; index < b.length; index++) {
+			if(b[index] != 0) {
+				builder.append((char) b[index]);
 			} else {
-				System.out.println("Null file name or mode!");
-				return false;
+				receivedFileName = builder.toString();
+				break;
 			}
+		}
+		//Get the mode from the byte array
+		builder = new StringBuilder();
+		for (int i = index+1; i < b.length; i++) {
+			if(b[i] != 0) {
+				builder.append((char) b[i]);
+			} else {
+				receivedMode = builder.toString();
+				break;
+			}
+		}
+		if (receivedMode != null && receivedFileName != null) {
+			return true;
+		} else {
+			System.out.println("Null file name or mode!");
+			return false;
+		}
 		//If the packet is a DATA or ACK
 		case (byte) 3: case (byte) 4:
-			return (b[3] == block);
+			return true;
 		//If the packet is an ERROR
 		case (byte) 5:
 			System.out.println("ERROR packet acknowledged.");
-			return true;
+		return true;
 		default: 
 			System.out.println("Invalid opcode!");
 			return false;
@@ -115,6 +120,7 @@ public class Server {
 	 */
 	public void write(byte[] receivedPacket, int port) {
 		DatagramSocket transferSocket;	//Socket through which the transfer is done
+		DatagramPacket lastPacket = new DatagramPacket(new byte[516], 516);
 		byte block;	//The current block of data being transferred
 		//Create data for an ACK packet
 		byte[] connection = new byte[4];
@@ -122,7 +128,7 @@ public class Server {
 		connection[1] = (byte) 4;
 		connection[2] = (byte) 0;
 		connection[3] = (byte) 0;
-		block = (byte) 0;
+		block = (byte) 1;
 		try {
 			DatagramPacket establishPacket = new DatagramPacket(connection, connection.length, 
 					InetAddress.getLocalHost(), port);
@@ -130,7 +136,7 @@ public class Server {
 			//Send ACK packet
 			transferSocket.send(establishPacket);
 
-			BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream("write.txt"));
+			BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(path + "\\write.txt"));
 			while(true) {
 				byte[] receiveFile = new byte[516];
 				establishPacket = new DatagramPacket(receiveFile, receiveFile.length);
@@ -141,7 +147,13 @@ public class Server {
 					error((byte)4, port);
 				}
 				else {
-					out.write(receiveFile, 4, establishPacket.getLength() - 4);
+					System.out.println("Reached");
+					if (lastPacket.getData()[3] == establishPacket.getData()[3]) {
+						System.out.println("Discarding Data pack as it is a duplicate");
+					} else {
+						out.write(receiveFile, 4, establishPacket.getLength() - 4);
+						lastPacket = establishPacket;
+					}
 					DatagramPacket acknowledge = new DatagramPacket(connection, connection.length, 
 							InetAddress.getLocalHost(), establishPacket.getPort());
 					System.out.println("Sending ACK packet.");
@@ -172,7 +184,7 @@ public class Server {
 		try {
 			transferSocket = new DatagramSocket();
 			byte[] sendingData = new byte[512];
-			BufferedInputStream input = new BufferedInputStream(new FileInputStream(receivedFileName));
+			BufferedInputStream input = new BufferedInputStream(new FileInputStream(path + "\\" + receivedFileName));
 			int x;	//End of stream indicator
 			while ((x = input.read(sendingData)) != -1) {
 				byte[] connection = new byte[516];	//Buffer for outgoing packets
@@ -185,12 +197,18 @@ public class Server {
 				do {
 					System.out.println("Sending DATA packet.");
 					transferSocket.send(fileTransfer);
-					received = receivePacket(transferSocket, received, port);
+					try {
+						System.out.println("Attempting to Receive Ack");
+						received = receivePacket(transferSocket, received, port, 2000);
+					} catch (Exception e) {
+						System.out.println("Ack Receive Timed out, Resending Data");
+						transferSocket.send(fileTransfer);
+					}
 				} while (received.getData()[1] == (byte) 5);	//Re-send if an ERROR is received
 				block++;
 			}
 			input.close();
-		} catch (Exception e) {
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
@@ -216,7 +234,7 @@ public class Server {
 			e.printStackTrace();
 		}
 	}
-	
+
 	/**
 	 * Receives a packet from an intended sender specified by port. If the received packet is invalid (ie it is not
 	 * from the intended sender, or it has an invalid opcode), the program will respond by sending an appropriate
@@ -228,18 +246,15 @@ public class Server {
 	 * @return the received DatagramPacket
 	 * @throws IOException
 	 */
-	private DatagramPacket receivePacket(DatagramSocket transferSocket, DatagramPacket receivePacket, int port)
+	private DatagramPacket receivePacket(DatagramSocket transferSocket, DatagramPacket receivePacket, int port, int timeout) throws Exception
 	{
 		boolean error = true;	//Indicates whether or not an invalid packet has been received and the server
-								//must continue waiting
+		//must continue waiting
 		try {
 			while(error) {
 				error = false;
-				System.out.println("Waiting for a packet...");
+				transferSocket.setSoTimeout(timeout);
 				transferSocket.receive(receivePacket);
-				System.out.println("Received a packet!");
-				System.out.println("Expected TID: " + port);
-				System.out.println("Received TID: " + receivePacket.getPort());
 				//Ensure received packet is a valid TFTP operation
 				if (!isValid(receivePacket.getData(), receivePacket.getData()[3], port)) {
 					System.out.println("Error, illegal TFTP operation!");
@@ -254,11 +269,11 @@ public class Server {
 				}
 			}
 		} catch (IOException e) {
-			e.printStackTrace();
+			throw e;
 		}
 		return receivePacket;
 	}
-	
+
 	/**
 	 * This method is used to run the Server
 	 */
@@ -266,7 +281,7 @@ public class Server {
 	{
 		byte[] b = new byte[100];
 		DatagramPacket receival = new DatagramPacket(b, b.length);
-		
+
 		/**
 		 * Thread created to launch prompt for server shutdown.
 		 * Thread is required as server could become blocked
@@ -287,10 +302,10 @@ public class Server {
 						if (input.equals("quit")) {
 							shutdown = true;
 						}
-//						close = JOptionPane.showConfirmDialog(null, modeLabel, "Warning", JOptionPane.CLOSED_OPTION);
-//						if (close == 0) { // ok has been selected, set shutdown to true
-//							shutdown = true;
-//						}
+						//						close = JOptionPane.showConfirmDialog(null, modeLabel, "Warning", JOptionPane.CLOSED_OPTION);
+						//						if (close == 0) { // ok has been selected, set shutdown to true
+						//							shutdown = true;
+						//						}
 					}
 					else if (shutdown && activeThreads.isEmpty()) { // wait till all active threads finish & shutdown requested
 						System.out.println("Server has shut down");
@@ -303,7 +318,7 @@ public class Server {
 			while (true) {
 				System.out.println("---------------------------------");
 				System.out.println("Waiting to Receive from Host");
-				
+
 				//Server receives a read or write request
 				transferSocket.receive(receival);
 				System.out.println("Received a packet.");
@@ -339,7 +354,13 @@ public class Server {
 	}
 
 	public static void main( String args[] ) {
+		File directory = new File("Server");
+		directory.mkdir();
 		Server s = new Server();
+		System.out.println("Please provide path for where the Server will Read/Write: ");
+		Scanner scanner = new Scanner(System.in);
+		s.path = scanner.nextLine();
+		System.out.println(s.path);
 		try {
 			s.runServer();
 		} catch (Exception e) {
