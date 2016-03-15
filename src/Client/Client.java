@@ -50,7 +50,7 @@ public class Client {
 	 * True if the client is in test mode (sending to the error simulator instead of the server).
 	 * **MUST BE MANUALLY SET TO ENABLE/DISABLE TEST MODE**
 	 */
-	private boolean testMode = true;
+	private boolean testMode = false;
 
 	/**
 	 * Port the client will send to (varies depending on operation mode).
@@ -177,6 +177,8 @@ public class Client {
 				//Ensure received packet came from the intended sender
 				if (receivePacket.getPort() != port) {
 					System.out.println("Error, unknown transfer ID");
+					System.out.println("Expected transfer ID: " + port);
+					System.out.println("Received packet's transfer ID: " + receivePacket.getPort());
 					error((byte) 5, receivePacket.getPort());
 					error = true;
 				}
@@ -207,7 +209,7 @@ public class Client {
 		//If the packet is a DATA or ACK
 		case 3: case 4:
 			return true;
-			//If the packet is an ERROR
+		//If the packet is an ERROR
 		case 5:
 			System.out.println("ERROR packet acknowledged.");
 			return true;
@@ -223,9 +225,7 @@ public class Client {
 	 * @param port port to send the packet through
 	 */
 	public void error(byte ErrorCode, int port){
-		DatagramSocket errorSimSocket;
 		try {
-			errorSimSocket = new DatagramSocket();
 			byte[] connection = new byte[516];
 			connection[0] = (byte) 0;
 			connection[1] = (byte) 5;
@@ -233,7 +233,7 @@ public class Client {
 			connection[3] = (byte) ErrorCode;
 			DatagramPacket ErrorMessage = new DatagramPacket(connection, 516, InetAddress.getLocalHost(), port);
 			System.out.println("Sending ERROR packet.");
-			errorSimSocket.send(ErrorMessage);
+			sendReceive.send(ErrorMessage);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -304,10 +304,18 @@ public class Client {
 							DatagramPacket sendPacket = fileTransfer;
 							sendReceive.send(fileTransfer);
 							try {
-								fileTransfer =  receivePacket(sendReceive, fileTransfer, received.getPort(), 1000);
+								fileTransfer = receivePacket(sendReceive, fileTransfer, received.getPort(), 1000);
 							} catch (SocketTimeoutException error) {
 								System.out.println("Socket Timeout Resending");
 								sendReceive.send(sendPacket);
+							}
+							//Check for any IO errors
+							if (fileTransfer.getData()[1] == (byte) 5 &&
+								(fileTransfer.getData()[3] == (byte) 1 || fileTransfer.getData()[3] == (byte) 2 ||
+								fileTransfer.getData()[3] == (byte) 3 || fileTransfer.getData()[3] == (byte) 6))
+							{
+								System.out.println("IO error detected. Ending file transfer.");
+								System.exit(1);
 							}
 						} while (fileTransfer.getData()[1] == (byte) 5);	//Re-send if an ERROR is received
 						//Send an ERROR if a received packet is invalid
@@ -344,7 +352,16 @@ public class Client {
 						if (fileTransfer.getData()[3] == lastPacket.getData()[3]) { //If same block (Written already)
 							System.out.println("Discarding Packet since it has already been written");
 						} else {
-							out.write(receiveFile, 3, fileTransfer.getLength() - 4);
+							try {
+								out.write(receiveFile, 3, fileTransfer.getLength() - 4);
+							} catch (IOException e) {
+								//It's possible this may be able to catch multiple IO errors along with error 3, in
+								//which case we might be able to just add a switch that identifies which error occurred
+								System.out.println("IOException: " + e.getMessage());
+								//Send an ERROR packet with error code 3 (disk full)
+								error((byte)3, acknowledge.getPort());
+								System.exit(1);
+							}
 							lastPacket = fileTransfer;
 						}
 						System.out.println("Sending ACK packet back to server");

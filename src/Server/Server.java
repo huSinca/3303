@@ -9,6 +9,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.util.Scanner;
 import java.util.Stack;
 
@@ -144,14 +145,22 @@ public class Server {
 				System.out.println("Received a packet.");
 				if (!isValid(establishPacket.getData(), block, port)) {
 					System.out.println("Packet recieved from host has an invalid Opcode, reporting back to Host");
-					error((byte)4, port);
+					error((byte)4, port, transferSocket);
 				}
 				else {
-					System.out.println("Reached");
 					if (lastPacket.getData()[3] == establishPacket.getData()[3]) {
 						System.out.println("Discarding Data pack as it is a duplicate");
 					} else {
-						out.write(receiveFile, 4, establishPacket.getLength() - 4);
+						try {
+							out.write(receiveFile, 4, establishPacket.getLength() - 4);
+						} catch (IOException e) {
+							//It's possible this may be able to catch multiple IO errors along with error 3, in
+							//which case we might be able to just add a switch that identifies which error occurred
+							System.out.println("IOException: " + e.getMessage());
+							//Send an ERROR packet with error code 3 (disk full)
+							error((byte)3, establishPacket.getPort(), transferSocket);
+							System.exit(1);
+						}
 						lastPacket = establishPacket;
 					}
 					DatagramPacket acknowledge = new DatagramPacket(connection, connection.length, 
@@ -200,9 +209,17 @@ public class Server {
 					try {
 						System.out.println("Attempting to Receive Ack");
 						received = receivePacket(transferSocket, received, port, 2000);
-					} catch (Exception e) {
+					} catch (SocketTimeoutException e) {
 						System.out.println("Ack Receive Timed out, Resending Data");
 						transferSocket.send(fileTransfer);
+					}
+					//Check for any IO errors
+					if (received.getData()[1] == (byte) 5 &&
+						(received.getData()[3] == (byte) 1 || received.getData()[3] == (byte) 2 ||
+							received.getData()[3] == (byte) 3 || received.getData()[3] == (byte) 6))
+					{
+						System.out.println("IO error detected. Ending file transfer.");
+						System.exit(1);
 					}
 				} while (received.getData()[1] == (byte) 5);	//Re-send if an ERROR is received
 				block++;
@@ -218,10 +235,10 @@ public class Server {
 	 * @param ErrorCode TFTP error code of the ERROR packet
 	 * @param port port to send the packet through
 	 */
-	public void error(byte ErrorCode, int port){
-		DatagramSocket transferSocket;	//Socket to be sent through
+	public void error(byte ErrorCode, int port, DatagramSocket transferSocket){
+		//DatagramSocket transferSocket;	//Socket to be sent through
 		try {
-			transferSocket = new DatagramSocket();
+			//transferSocket = new DatagramSocket();
 			byte[] connection = new byte[516];
 			connection[0] = (byte) 0;
 			connection[1] = (byte) 5;
@@ -246,7 +263,7 @@ public class Server {
 	 * @return the received DatagramPacket
 	 * @throws IOException
 	 */
-	private DatagramPacket receivePacket(DatagramSocket transferSocket, DatagramPacket receivePacket, int port, int timeout) throws Exception
+	private DatagramPacket receivePacket(DatagramSocket transferSocket, DatagramPacket receivePacket, int port, int timeout) throws SocketTimeoutException
 	{
 		boolean error = true;	//Indicates whether or not an invalid packet has been received and the server
 		//must continue waiting
@@ -258,18 +275,18 @@ public class Server {
 				//Ensure received packet is a valid TFTP operation
 				if (!isValid(receivePacket.getData(), receivePacket.getData()[3], port)) {
 					System.out.println("Error, illegal TFTP operation!");
-					error((byte) 4, receivePacket.getPort());
+					error((byte) 4, receivePacket.getPort(), transferSocket);
 					error = true;
 				}
 				//Ensure received packet came from the intended sender
 				if (receivePacket.getPort() != port) {
 					System.out.println("Error, unknown transfer ID");
-					error((byte) 5, receivePacket.getPort());
+					error((byte) 5, receivePacket.getPort(), transferSocket);
 					error = true;
 				}
 			}
 		} catch (IOException e) {
-			throw e;
+			e.printStackTrace();
 		}
 		return receivePacket;
 	}
