@@ -350,7 +350,11 @@ public class Server {
 								System.out.println("Read request recieved");
 								if (!new File(path + "\\" + receivedFileName).exists()) {
 									System.out.println("File Does Not Exist");
-									error((byte) 1, port, transferSocket);
+									try {
+										error((byte) 1, port, new DatagramSocket());
+									} catch (SocketException e) {
+										e.printStackTrace();
+									}
 									return;
 								}
 								read(b, port);
@@ -358,7 +362,11 @@ public class Server {
 								System.out.println("Write request recieved");
 								if (new File(path + "\\" + receivedFileName).exists()) {
 									System.out.println("File Already Exists");
-									error((byte) 6, port, transferSocket);
+									try {
+										error((byte) 6, port, new DatagramSocket());
+									} catch (SocketException e) {
+										e.printStackTrace();
+									}
 									return;
 								}
 								write(b, port);
