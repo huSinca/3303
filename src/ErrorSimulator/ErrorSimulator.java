@@ -418,10 +418,12 @@ public class ErrorSimulator extends Thread {
 							if (es.packetToPerform.equals("ACK") || es.packetToPerform.equals("DATA"))packet = true;
 						}
 					}
+					System.out.println("------------------------------------------------");
 					System.out.println("System is set to perform " + es.networkErrorType.toString() + " and error type: " +es.errorType.toString());
 					System.out.println("Your setup has been saved!");
 					System.out.println("** Run Client operation now to see desired error simulation.**");
-					System.out.println("Showing you initial menu again so you may simulate other errors.");
+					System.out.println("------------------------------------------------");
+					System.out.println("Showing you initial menu again so you may change the setup.");
 				}
 			}
 		}).start();

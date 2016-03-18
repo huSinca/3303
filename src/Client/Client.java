@@ -335,7 +335,7 @@ public class Client {
 					ack[2] = 0;
 					block = 0; //The current block of data being transferred
 					block++;
-					BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(path + "\\read.txt"));
+					BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(path + "\\"+ file));
 					out.write(receive, 4, received.getLength() - 4);
 					DatagramPacket acknowledge = new DatagramPacket(ack, 4, InetAddress.getLocalHost(), received.getPort());
 					System.out.println("Sending ACK packet to server");

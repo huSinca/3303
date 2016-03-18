@@ -136,7 +136,7 @@ public class Server {
 			//Send ACK packet
 			transferSocket.send(establishPacket);
 
-			BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(path + "\\write.txt"));
+			BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(path + "\\" + receivedFileName));
 			while(true) {
 				byte[] receiveFile = new byte[516];
 				establishPacket = new DatagramPacket(receiveFile, receiveFile.length);
