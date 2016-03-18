@@ -348,9 +348,19 @@ public class Server {
 							activeThreads.push(0);
 							if (b[1] == 1) {
 								System.out.println("Read request recieved");
+								if (!new File(path + "\\" + receivedFileName).exists()) {
+									System.out.println("File Does Not Exist");
+									error((byte) 1, port, transferSocket);
+									return;
+								}
 								read(b, port);
 							} else if (b[1] == 2) {
 								System.out.println("Write request recieved");
+								if (new File(path + "\\" + receivedFileName).exists()) {
+									System.out.println("File Already Exists");
+									error((byte) 6, port, transferSocket);
+									return;
+								}
 								write(b, port);
 							} else {
 								System.out.println("ERR");

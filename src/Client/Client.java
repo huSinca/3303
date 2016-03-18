@@ -1,6 +1,7 @@
 package Client;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -210,7 +211,7 @@ public class Client {
 		//If the packet is a DATA or ACK
 		case 3: case 4:
 			return true;
-		//If the packet is an ERROR
+			//If the packet is an ERROR
 		case 5:
 			System.out.println("ERROR packet acknowledged.");
 			return true;
@@ -256,9 +257,17 @@ public class Client {
 			byte[] request;
 			if (mode.equals("read")) { // check request type
 				System.out.println("Read Request");
+				if (new File(path + "\\" + file).exists()) {
+					System.out.println("File Already Exists"); 
+					continue;
+				}
 				request = createRequest("Read", file, "mode");
 			} else if (mode.equals("write")) {
 				System.out.println("Write Request");
+				if (!new File(path + "\\" + file).exists()) {
+					System.out.println("File Does Not Exist");
+					continue;
+				}
 				request = createRequest("Write", file, "mode");
 			} else {
 				continue;
@@ -277,6 +286,13 @@ public class Client {
 				DatagramPacket lastPacket = received;
 				System.out.println("Waiting for a response...");
 				sendReceive.receive(received);
+				if (receive[3] == 1) {
+					System.out.println("File wasn't found");
+					continue;
+				} else if (receive[3] == 6) {
+					System.out.println("File already exists");
+					continue;
+				}
 				System.out.println("Received a response packet.");
 				byte rw = (receive[1] == (byte) 4) ? (byte) 0 : (byte) 1;
 				byte block;
@@ -290,7 +306,7 @@ public class Client {
 					BufferedInputStream input = new BufferedInputStream(new FileInputStream(path + "\\" + file));
 					byte[] sendingData = new byte[512];
 					block = (byte) 1; //The current block of data being transferred
-					while ((x = input.read(sendingData)) != -1) {
+					while ((x = input.read(sendingData)) != -1) {								
 						byte[] sendingMessage = new byte[516];
 						sendingMessage[0] = (byte) 0;
 						sendingMessage[1] = (byte) 3;
@@ -312,8 +328,8 @@ public class Client {
 							}
 							//Check for any IO errors
 							if (fileTransfer.getData()[1] == (byte) 5 &&
-								(fileTransfer.getData()[3] == (byte) 1 || fileTransfer.getData()[3] == (byte) 2 ||
-								fileTransfer.getData()[3] == (byte) 3 || fileTransfer.getData()[3] == (byte) 6))
+									(fileTransfer.getData()[3] == (byte) 1 || fileTransfer.getData()[3] == (byte) 2 ||
+									fileTransfer.getData()[3] == (byte) 3 || fileTransfer.getData()[3] == (byte) 6))
 							{
 								System.out.println("IO error detected. Ending file transfer.");
 							}
