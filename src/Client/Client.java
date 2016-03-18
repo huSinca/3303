@@ -68,7 +68,7 @@ public class Client {
 
 	/**
 	 * This method will print the given byte array's contents both as bytes and as a string
-	 * 
+	 *
 	 * @param array the byte array that needs to be printed
 	 * @param length the length of the printed byte array
 	 */
@@ -81,7 +81,7 @@ public class Client {
 
 	/**
 	 * This method creates the request that the server sends.
-	 * 
+	 *
 	 * @param requestType
 	 *            The type of request being set (Write, Read, Invalid). Default
 	 *            is Read
@@ -112,7 +112,7 @@ public class Client {
 	/**
 	 * Launches a dialog box for user input
 	 * Options:
-	 * 	- accepts "read" or "write" as text (not case sensitive). 
+	 * 	- accepts "read" or "write" as text (not case sensitive).
 	 *  - once valid "read" or "write" is detected will prompt
 	 *    for file name.
 	 *  - once valid filename is given, it will allow runClient() to
@@ -152,7 +152,7 @@ public class Client {
 	 * Receives a packet from an intended sender specified by port. If the received packet is invalid (ie it is not
 	 * from the intended sender, or it has an invalid opcode), the program will respond by sending an appropriate
 	 * ERROR packet. It then continues waiting for a packet.
-	 * 
+	 *
 	 * @param transferSocket socket to receive from
 	 * @param receivePacket packet received
 	 * @param port port number of the intended sender
@@ -214,7 +214,7 @@ public class Client {
 		case 5:
 			System.out.println("ERROR packet acknowledged.");
 			return true;
-		default: 
+		default:
 			System.out.println("Invalid opcode!");
 			return false;
 		}
@@ -282,7 +282,7 @@ public class Client {
 				byte block;
 				int x;
 				if (isValid(received.getData(), rw, sendPort)) {
-					switch (receive[1]) 
+					switch (receive[1])
 					{
 					//Write operation
 					case (byte) 4:
@@ -316,7 +316,6 @@ public class Client {
 								fileTransfer.getData()[3] == (byte) 3 || fileTransfer.getData()[3] == (byte) 6))
 							{
 								System.out.println("IO error detected. Ending file transfer.");
-								System.exit(1);
 							}
 						} while (fileTransfer.getData()[1] == (byte) 5);	//Re-send if an ERROR is received
 						//Send an ERROR if a received packet is invalid
@@ -355,7 +354,7 @@ public class Client {
 						} else {
 							try {
 								out.write(receiveFile, 3, fileTransfer.getLength() - 4);
-								
+
 							} catch (AccessControlException e) {
 								error((byte)2, acknowledge.getPort());
 							} catch (IOException e) {
@@ -364,7 +363,6 @@ public class Client {
 								System.out.println("IOException: " + e.getMessage());
 								//Send an ERROR packet with error code 3 (disk full)
 								error((byte)3, acknowledge.getPort());
-								System.exit(1);
 							}
 							lastPacket = fileTransfer;
 						}
