@@ -154,6 +154,7 @@ public class Server {
 							out.write(receiveFile, 4, establishPacket.getLength() - 4);
 						} 
 						catch (AccessControlException e) {
+							System.out.println("Server does not have permission to access file.");
 							error((byte)2, port, transferSocket);
 						} catch (IOException e) {
 							//It's possible this may be able to catch multiple IO errors along with error 3, in
@@ -161,7 +162,6 @@ public class Server {
 							System.out.println("IOException: " + e.getMessage());
 							//Send an ERROR packet with error code 3 (disk full)
 							error((byte)3, port, transferSocket);
-							System.exit(1);
 						}
 						lastPacket = establishPacket;
 					}
@@ -221,7 +221,6 @@ public class Server {
 							received.getData()[3] == (byte) 3 || received.getData()[3] == (byte) 6))
 					{
 						System.out.println("IO error detected. Ending file transfer.");
-						System.exit(1);
 					}
 				} while (received.getData()[1] == (byte) 5);	//Re-send if an ERROR is received
 				block++;

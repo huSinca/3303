@@ -356,6 +356,7 @@ public class Client {
 								out.write(receiveFile, 3, fileTransfer.getLength() - 4);
 
 							} catch (AccessControlException e) {
+								System.out.println("Server does not have permission to access file.");
 								error((byte)2, acknowledge.getPort());
 							} catch (IOException e) {
 								//It's possible this may be able to catch multiple IO errors along with error 3, in
