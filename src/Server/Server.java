@@ -10,10 +10,9 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.security.AccessControlException;
 import java.util.Scanner;
 import java.util.Stack;
-
-import javax.swing.JLabel;
 
 public class Server {
 
@@ -153,12 +152,15 @@ public class Server {
 					} else {
 						try {
 							out.write(receiveFile, 4, establishPacket.getLength() - 4);
+						} 
+						catch (AccessControlException e) {
+							error((byte)2, port, transferSocket);
 						} catch (IOException e) {
 							//It's possible this may be able to catch multiple IO errors along with error 3, in
 							//which case we might be able to just add a switch that identifies which error occurred
 							System.out.println("IOException: " + e.getMessage());
 							//Send an ERROR packet with error code 3 (disk full)
-							error((byte)3, establishPacket.getPort(), transferSocket);
+							error((byte)3, port, transferSocket);
 							System.exit(1);
 						}
 						lastPacket = establishPacket;
@@ -310,21 +312,20 @@ public class Server {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
-				JLabel modeLabel = new JLabel("Shutdown Server?");
-				int close;
 				while (true) { // run till shutdown requested
 					if(!shutdown) {
 						System.out.print("Enter quit to shutdown the Server: ");
-						String input = new Scanner(System.in).nextLine().toLowerCase();
+						Scanner in = new Scanner(System.in);
+						String input = in.nextLine().toLowerCase();
 						if (input.equals("quit")) {
+							in.close();
 							shutdown = true;
 						}
 						//						close = JOptionPane.showConfirmDialog(null, modeLabel, "Warning", JOptionPane.CLOSED_OPTION);
 						//						if (close == 0) { // ok has been selected, set shutdown to true
 						//							shutdown = true;
 						//						}
-					}
-					else if (shutdown && activeThreads.isEmpty()) { // wait till all active threads finish & shutdown requested
+					} else if (shutdown && activeThreads.isEmpty()) { // wait till all active threads finish & shutdown requested
 						System.out.println("Server has shut down");
 						System.exit(0);
 					}
@@ -383,5 +384,6 @@ public class Server {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		scanner.close();
 	}
 }

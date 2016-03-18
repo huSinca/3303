@@ -289,6 +289,7 @@ public class ErrorSimulator extends Thread {
 			TIDErrorSocket.receive(receive);
 			System.out.println("Received a " + packetToPerform + "from " + second);
 			System.out.println("-------------------------------------");
+			TIDErrorSocket.close();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -374,22 +375,19 @@ public class ErrorSimulator extends Thread {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
+				@SuppressWarnings("resource")
+				Scanner userInput = new Scanner(System.in);
 				while (true) {
-					Scanner userInput = new Scanner(System.in);
-					System.out.println("Would you like to simulate a Network Error (y/n): ");
+					es.askNetworkErrors();
 					String networkInput = userInput.nextLine().toLowerCase();
-					if (networkInput.equals("y")) {
-						es.askNetworkErrors();
-						networkInput = userInput.nextLine().toLowerCase();
-						if (networkInput.equals("1")) {
-							es.networkErrorType = NetworkErrors.DELAY;
-						} else if (networkInput.equals("2")) {
-							es.networkErrorType = NetworkErrors.DUPLICATE;
-						} else if (networkInput.equals("3")) {
-							es.networkErrorType = NetworkErrors.LOSE;
-						} else {
-							es.networkErrorType = NetworkErrors.NORMAL;
-						}
+					if (networkInput.equals("1")) {
+						es.networkErrorType = NetworkErrors.DELAY;
+					} else if (networkInput.equals("2")) {
+						es.networkErrorType = NetworkErrors.DUPLICATE;
+					} else if (networkInput.equals("3")) {
+						es.networkErrorType = NetworkErrors.LOSE;
+					} else {
+						es.networkErrorType = NetworkErrors.NORMAL;
 					}
 					boolean errorSet = false;
 					while(!errorSet) {
@@ -410,7 +408,6 @@ public class ErrorSimulator extends Thread {
 						}
 						errorSet = true;
 					}
-
 					if (es.errorType != Errors.NORMAL_MODE || es.networkErrorType != NetworkErrors.NORMAL) {
 						System.out.println("Enter Block Number to Perform Error On: ");
 						es.blockToPerform = new Integer(userInput.nextLine().toLowerCase());
@@ -418,9 +415,13 @@ public class ErrorSimulator extends Thread {
 						while (!packet) {
 							System.out.println("Enter Packet to Perform Error On: (DATA or ACK)");
 							es.packetToPerform = userInput.nextLine().toUpperCase();
-							if (es.packetToPerform.equals("ACK") || es.packetToPerform.equals("DATA")) packet = true;
+							if (es.packetToPerform.equals("ACK") || es.packetToPerform.equals("DATA"))packet = true;
 						}
 					}
+					System.out.println("System is set to perform " + es.networkErrorType.toString() + " and error type: " +es.errorType.toString());
+					System.out.println("Your setup has been saved!");
+					System.out.println("** Run Client operation now to see desired error simulation.**");
+					System.out.println("Showing you initial menu again so you may simulate other errors.");
 				}
 			}
 		}).start();

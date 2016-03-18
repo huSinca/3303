@@ -9,6 +9,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.security.AccessControlException;
 
 import javax.swing.JOptionPane;
 
@@ -354,6 +355,9 @@ public class Client {
 						} else {
 							try {
 								out.write(receiveFile, 3, fileTransfer.getLength() - 4);
+								
+							} catch (AccessControlException e) {
+								error((byte)2, acknowledge.getPort());
 							} catch (IOException e) {
 								//It's possible this may be able to catch multiple IO errors along with error 3, in
 								//which case we might be able to just add a switch that identifies which error occurred
