@@ -52,7 +52,7 @@ public class Client {
 	 * True if the client is in test mode (sending to the error simulator instead of the server).
 	 * **MUST BE MANUALLY SET TO ENABLE/DISABLE TEST MODE**
 	 */
-	private boolean testMode = false;
+	private boolean testMode = true;
 
 	/**
 	 * Port the client will send to (varies depending on operation mode).
@@ -288,10 +288,10 @@ public class Client {
 				sendReceive.receive(received);
 				if (receive[3] == 1) {
 					System.out.println("File wasn't found");
-					continue;
+					//continue; This is what broke everything in the demo btw DB
 				} else if (receive[3] == 6) {
 					System.out.println("File already exists");
-					continue;
+					//continue;
 				}
 				System.out.println("Received a response packet.");
 				byte rw = (receive[1] == (byte) 4) ? (byte) 0 : (byte) 1;
@@ -407,7 +407,13 @@ public class Client {
 	public static void main(String args[]) {
 		Client c = new Client();
 		c.path = JOptionPane.showInputDialog(null, "Enter path where Client will Read/Write", "Enter Path", JOptionPane.INFORMATION_MESSAGE);
-		c.runClient();
+		if(c.path == null){
+			System.out.println("Closing client");
+			System.exit(0);
+		}
+		else {
+			c.runClient();
+		}
 	}
 
 }

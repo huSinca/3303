@@ -389,8 +389,6 @@ public class Server {
 	}
 
 	public static void main( String args[] ) {
-		File directory = new File("Server");
-		directory.mkdir();
 		Server s = new Server();
 		System.out.println("Please provide path for where the Server will Read/Write: ");
 		Scanner scanner = new Scanner(System.in);
