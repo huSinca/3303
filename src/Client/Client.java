@@ -52,7 +52,7 @@ public class Client {
 	 * True if the client is in test mode (sending to the error simulator instead of the server).
 	 * **MUST BE MANUALLY SET TO ENABLE/DISABLE TEST MODE**
 	 */
-	private boolean testMode = true;
+	private boolean testMode = false;
 
 	/**
 	 * Port the client will send to (varies depending on operation mode).
@@ -286,10 +286,10 @@ public class Client {
 				DatagramPacket lastPacket = received;
 				System.out.println("Waiting for a response...");
 				sendReceive.receive(received);
-				if (receive[3] == 1) {
+				if (receive[1] == 5 && receive[3] == 1) {
 					System.out.println("File wasn't found");
 					//continue; This is what broke everything in the demo btw DB
-				} else if (receive[3] == 6) {
+				} else if (receive[1] == 5 && receive[3] == 6) {
 					System.out.println("File already exists");
 					//continue;
 				}
@@ -369,7 +369,7 @@ public class Client {
 							System.out.println("Discarding Packet since it has already been written");
 						} else {
 							try {
-								out.write(receiveFile, 3, fileTransfer.getLength() - 4);
+								out.write(receiveFile, 4, fileTransfer.getLength() - 4);
 
 							} catch (AccessControlException e) {
 								System.out.println("Server does not have permission to access file.");
@@ -383,6 +383,7 @@ public class Client {
 							}
 							lastPacket = fileTransfer;
 						}
+						printByteArray(fileTransfer.getData(), fileTransfer.getLength());
 						System.out.println("Sending ACK packet back to server");
 						sendReceive.send(acknowledge);
 						x = fileTransfer.getLength();
