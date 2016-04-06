@@ -52,7 +52,7 @@ public class Client {
 	 * True if the client is in test mode (sending to the error simulator instead of the server).
 	 * **MUST BE MANUALLY SET TO ENABLE/DISABLE TEST MODE**
 	 */
-	private boolean testMode = false;
+	private boolean testMode = true;
 
 	/**
 	 * Port the client will send to (varies depending on operation mode).
