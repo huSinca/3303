@@ -129,7 +129,6 @@ public class Client {
 		return b;
 	}
 
-
 	/**
 	 * Launches a dialog box for user input
 	 * Options:
@@ -299,6 +298,7 @@ public class Client {
 			try {
 				p = new DatagramPacket(request, request.length, serverAddress, sendPort);
 				System.out.println("Sending Request");
+				analyzePacket(p);
 				sendReceive.send(p);
 
 				// Wait for response
@@ -341,6 +341,7 @@ public class Client {
 						do {
 							System.out.println("Sending following Data to Server ");
 							DatagramPacket sendPacket = fileTransfer;
+							analyzePacket(fileTransfer);
 							sendReceive.send(fileTransfer);
 							try {
 								fileTransfer = receivePacket(sendReceive, fileTransfer, received.getPort(),1000);
@@ -377,6 +378,7 @@ public class Client {
 					out.write(receive, 4, received.getLength() - 4);
 					DatagramPacket acknowledge = new DatagramPacket(ack, 4, serverAddress, received.getPort());
 					System.out.println("Sending ACK packet to server");
+					analyzePacket(acknowledge);
 					sendReceive.send(acknowledge);
 					x = received.getLength();
 					while (x == 516) {
@@ -406,6 +408,7 @@ public class Client {
 							lastPacket = fileTransfer;
 						}
 						System.out.println("Sending ACK packet back to server");
+						analyzePacket(acknowledge);
 						sendReceive.send(acknowledge);
 						x = fileTransfer.getLength();
 					}

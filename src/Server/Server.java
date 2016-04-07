@@ -138,6 +138,7 @@ public class Server {
 			transferSocket = new DatagramSocket();
 			//Send ACK packet
 			System.out.println("Sending ACK");
+			Client.analyzePacket(establishPacket);
 			transferSocket.send(establishPacket);
 
 			File f = new File(path + "\\" + receivedFileName);
@@ -184,6 +185,7 @@ public class Server {
 					DatagramPacket acknowledge = new DatagramPacket(connection, connection.length, 
 							address, establishPacket.getPort());
 					System.out.println("Sending ACK packet.");
+					Client.analyzePacket(acknowledge);
 					transferSocket.send(acknowledge);
 					//A packet of less than max size indicates the end of the transfer
 					if (establishPacket.getLength() < 516) break;
@@ -230,6 +232,7 @@ public class Server {
 				DatagramPacket fileTransfer = new DatagramPacket(connection, x + 4, address, port);
 				do {
 					System.out.println("Sending DATA packet.");
+					Client.analyzePacket(fileTransfer);
 					transferSocket.send(fileTransfer);
 					try {
 						System.out.println("Attempting to Receive Ack");
