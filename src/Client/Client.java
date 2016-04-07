@@ -1,4 +1,5 @@
 package Client;
+import java.awt.HeadlessException;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -10,6 +11,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.security.AccessControlException;
 
 import javax.swing.JOptionPane;
@@ -37,6 +39,11 @@ public class Client {
 	 * Type of mode the user has entered ("Read" or "Write")
 	 */
 	private String mode;
+	
+	/**
+	 * Address of the server
+	 */
+	private InetAddress serverAddress;
 
 	/**
 	 *  Name of the file the user has entered
@@ -78,6 +85,17 @@ public class Client {
 			System.out.println("Byte " + j + ": " + array[j]);
 		}
 		System.out.println(new String(array, 0, length));
+	}
+	
+	public static void analyzePacket(DatagramPacket packet) {
+		byte[] received = packet.getData();
+		System.out.println("Packet Opcode: " + received[1]);
+		System.out.println("Packet Type: " + ErrorSimulator.packetInfo(packet));
+		System.out.print("Packet Contents: ");
+		for (int i = 0; i < packet.getLength(); i++)  {
+			System.out.println(received[i]);
+		}
+		System.out.println();
 	}
 
 	/**
@@ -186,7 +204,7 @@ public class Client {
 				}
 			}
 		} catch (IOException e) {
-			e.printStackTrace();
+			throw new SocketTimeoutException();
 		}
 		return receivePacket;
 	}
@@ -233,7 +251,7 @@ public class Client {
 			connection[1] = (byte) 5;
 			connection[2] = (byte) 0;
 			connection[3] = (byte) ErrorCode;
-			DatagramPacket ErrorMessage = new DatagramPacket(connection, 516, InetAddress.getLocalHost(), port);
+			DatagramPacket ErrorMessage = new DatagramPacket(connection, 516, serverAddress, port);
 			System.out.println("Sending ERROR packet.");
 			sendReceive.send(ErrorMessage);
 		} catch (Exception e) {
@@ -276,7 +294,7 @@ public class Client {
 			//Send read or write request
 			DatagramPacket p;
 			try {
-				p = new DatagramPacket(request, request.length, InetAddress.getLocalHost(), sendPort);
+				p = new DatagramPacket(request, request.length, serverAddress, sendPort);
 				System.out.println("Sending Request");
 				sendReceive.send(p);
 
@@ -314,14 +332,14 @@ public class Client {
 						sendingMessage[3] = block;
 
 						System.arraycopy(sendingData, 0, sendingMessage, 4, sendingData.length);
-						DatagramPacket fileTransfer = new DatagramPacket(sendingMessage, x + 4, InetAddress.getLocalHost(), received.getPort());
+						DatagramPacket fileTransfer = new DatagramPacket(sendingMessage, x + 4, serverAddress, received.getPort());
 
 						do {
 							System.out.println("Sending following Data to Server ");
 							DatagramPacket sendPacket = fileTransfer;
 							sendReceive.send(fileTransfer);
 							try {
-								fileTransfer = receivePacket(sendReceive, fileTransfer, received.getPort(), 1000);
+								fileTransfer = receivePacket(sendReceive, fileTransfer, received.getPort(),1000);
 							} catch (SocketTimeoutException error) {
 								System.out.println("Socket Timeout Resending");
 								sendReceive.send(sendPacket);
@@ -353,7 +371,7 @@ public class Client {
 					block++;
 					BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(path + "\\"+ file));
 					out.write(receive, 4, received.getLength() - 4);
-					DatagramPacket acknowledge = new DatagramPacket(ack, 4, InetAddress.getLocalHost(), received.getPort());
+					DatagramPacket acknowledge = new DatagramPacket(ack, 4, serverAddress, received.getPort());
 					System.out.println("Sending ACK packet to server");
 					sendReceive.send(acknowledge);
 					x = received.getLength();
@@ -400,13 +418,21 @@ public class Client {
 					error((byte)4, SERVERPORT);
 				}
 			} catch (IOException e1) {
-				e1.printStackTrace();
+				System.out.println("Found Exception " + e1);
 			}
 		}
 	}
 
-	public static void main(String args[]) {
+	public static void main(String args[]) throws HeadlessException, UnknownHostException {
 		Client c = new Client();
+		String test = JOptionPane.showInputDialog(null, "Would you like to run in test mode (y or n) ", "Test Mode?", JOptionPane.INFORMATION_MESSAGE);
+		while (!test.equals("y") && !test.equals("n")) {
+			test = JOptionPane.showInputDialog(null, "Would you like to run in test mode (y or n) ", "Test Mode?", JOptionPane.INFORMATION_MESSAGE);
+		}
+		if (test.equals("y")) c.sendPort = 68;
+		else c.sendPort = 69;
+		c.serverAddress = InetAddress.getByName(JOptionPane.showInputDialog(null, "Enter the address of the server", "Enter Address", JOptionPane.INFORMATION_MESSAGE));
+		System.out.println("Successfully connected to: " + c.serverAddress);
 		c.path = JOptionPane.showInputDialog(null, "Enter path where Client will Read/Write", "Enter Path", JOptionPane.INFORMATION_MESSAGE);
 		if(c.path == null){
 			System.out.println("Closing client");

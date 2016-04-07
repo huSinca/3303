@@ -10,6 +10,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.security.AccessControlException;
 import java.util.Scanner;
 import java.util.Stack;
@@ -118,7 +119,7 @@ public class Server {
 	 * @param receivedPacket data held in the write request
 	 * @param port port number from which the write request came
 	 */
-	public void write(byte[] receivedPacket, int port) {
+	public void write(byte[] receivedPacket, int port, InetAddress address) {
 		DatagramSocket transferSocket;	//Socket through which the transfer is done
 		DatagramPacket lastPacket = new DatagramPacket(new byte[516], 516);
 		byte block;	//The current block of data being transferred
@@ -131,9 +132,10 @@ public class Server {
 		block = (byte) 1;
 		try {
 			DatagramPacket establishPacket = new DatagramPacket(connection, connection.length, 
-					InetAddress.getLocalHost(), port);
+					address, port);
 			transferSocket = new DatagramSocket();
 			//Send ACK packet
+			System.out.println("Sending ACK");
 			transferSocket.send(establishPacket);
 
 			BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(path + "\\" + receivedFileName));
@@ -144,7 +146,7 @@ public class Server {
 				System.out.println("Received a packet.");
 				if (!isValid(establishPacket.getData(), block, port)) {
 					System.out.println("Packet recieved from host has an invalid Opcode, reporting back to Host");
-					error((byte)4, port, transferSocket);
+					error((byte)4, port, transferSocket, address);
 				}
 				else {
 					if (lastPacket.getData()[3] == establishPacket.getData()[3]) {
@@ -155,18 +157,18 @@ public class Server {
 						} 
 						catch (AccessControlException e) {
 							System.out.println("Server does not have permission to access file.");
-							error((byte)2, port, transferSocket);
+							error((byte)2, port, transferSocket, address);
 						} catch (IOException e) {
 							//It's possible this may be able to catch multiple IO errors along with error 3, in
 							//which case we might be able to just add a switch that identifies which error occurred
 							System.out.println("IOException: " + e.getMessage());
 							//Send an ERROR packet with error code 3 (disk full)
-							error((byte)3, port, transferSocket);
+							error((byte)3, port, transferSocket, address);
 						}
 						lastPacket = establishPacket;
 					}
 					DatagramPacket acknowledge = new DatagramPacket(connection, connection.length, 
-							InetAddress.getLocalHost(), establishPacket.getPort());
+							address, establishPacket.getPort());
 					System.out.println("Sending ACK packet.");
 					transferSocket.send(acknowledge);
 					//A packet of less than max size indicates the end of the transfer
@@ -186,7 +188,7 @@ public class Server {
 	 * @param receivedPacket data held in the read request
 	 * @param portport number from which the read request came
 	 */
-	public void read(byte[] receivedPacket, int port) {
+	public void read(byte[] receivedPacket, int port, InetAddress address) {
 		DatagramSocket transferSocket;	//Socket through which the transfer is done
 		byte block;	//The current block of data being transferred
 		byte[] receive = new byte[4];	//Buffer for incoming packets
@@ -204,7 +206,7 @@ public class Server {
 				connection[2] = (byte) 0;
 				connection[3] = block;
 				System.arraycopy(sendingData, 0, connection, 4, sendingData.length);
-				DatagramPacket fileTransfer = new DatagramPacket(connection, x + 4, InetAddress.getLocalHost(), port);
+				DatagramPacket fileTransfer = new DatagramPacket(connection, x + 4, address, port);
 				do {
 					System.out.println("Sending DATA packet.");
 					transferSocket.send(fileTransfer);
@@ -236,7 +238,7 @@ public class Server {
 	 * @param ErrorCode TFTP error code of the ERROR packet
 	 * @param port port to send the packet through
 	 */
-	public void error(byte ErrorCode, int port, DatagramSocket transferSocket){
+	public void error(byte ErrorCode, int port, DatagramSocket transferSocket, InetAddress address){
 		//DatagramSocket transferSocket;	//Socket to be sent through
 		try {
 			//transferSocket = new DatagramSocket();
@@ -245,7 +247,7 @@ public class Server {
 			connection[1] = (byte) 5;
 			connection[2] = (byte) 0;
 			connection[3] = (byte) ErrorCode;
-			DatagramPacket ErrorMessage = new DatagramPacket(connection, 516, InetAddress.getLocalHost(), port);
+			DatagramPacket ErrorMessage = new DatagramPacket(connection, 516, address, port);
 			System.out.println("Sending ERROR(From Server) packet.");
 			transferSocket.send(ErrorMessage);
 		} catch (Exception e) {
@@ -276,13 +278,13 @@ public class Server {
 				//Ensure received packet is a valid TFTP operation
 				if (!isValid(receivePacket.getData(), receivePacket.getData()[3], port)) {
 					System.out.println("Error, illegal TFTP operation!");
-					error((byte) 4, receivePacket.getPort(), transferSocket);
+					error((byte) 4, receivePacket.getPort(), transferSocket, receivePacket.getAddress());
 					error = true;
 				}
 				//Ensure received packet came from the intended sender
 				if (receivePacket.getPort() != port) {
 					System.out.println("Error, unknown transfer ID");
-					error((byte) 5, receivePacket.getPort(), transferSocket);
+					error((byte) 5, receivePacket.getPort(), transferSocket, receivePacket.getAddress());
 					error = true;
 				}
 			}
@@ -340,6 +342,7 @@ public class Server {
 				transferSocket.receive(receival);
 				System.out.println("Received a packet.");
 				int port = receival.getPort();
+				InetAddress address = receival.getAddress();
 				if (isValid(b, (byte) 0, port)) {
 					new Thread(new Runnable() {
 						@Override
@@ -351,25 +354,25 @@ public class Server {
 								if (!new File(path + "\\" + receivedFileName).exists()) {
 									System.out.println("File Does Not Exist");
 									try {
-										error((byte) 1, port, new DatagramSocket());
+										error((byte) 1, port, new DatagramSocket(), address);
 									} catch (SocketException e) {
 										e.printStackTrace();
 									}
 									return;
 								}
-								read(b, port);
+								read(b, port, address);
 							} else if (b[1] == 2) {
 								System.out.println("Write request recieved");
 								if (new File(path + "\\" + receivedFileName).exists()) {
 									System.out.println("File Already Exists");
 									try {
-										error((byte) 6, port, new DatagramSocket());
+										error((byte) 6, port, new DatagramSocket(), address);
 									} catch (SocketException e) {
 										e.printStackTrace();
 									}
 									return;
 								}
-								write(b, port);
+								write(b, port, address);
 							} else {
 								System.out.println("ERR");
 							}
@@ -390,6 +393,11 @@ public class Server {
 
 	public static void main( String args[] ) {
 		Server s = new Server();
+		try {
+			System.out.println("Server's InetAddress: " + InetAddress.getLocalHost().getHostName());
+		} catch (UnknownHostException e1) {
+			e1.printStackTrace();
+		}
 		System.out.println("Please provide path for where the Server will Read/Write: ");
 		Scanner scanner = new Scanner(System.in);
 		s.path = scanner.nextLine();

@@ -305,7 +305,7 @@ public class ErrorSimulator extends Thread {
 		try {
 			while (true) {
 				serverSocket = new DatagramSocket();
-				newClientSocket = new DatagramSocket();
+				//newClientSocket = new DatagramSocket();
 				clientSocket.receive(receival);
 				System.out.println("Received " + packetInfo(receival) + " packet from Client");
 				client = receival.getPort();
@@ -319,6 +319,8 @@ public class ErrorSimulator extends Thread {
 						try {
 							System.out.println("Sending " + packetInfo(receival) + " packet to Server");
 							int port = receival.getPort();
+							InetAddress clientAddress = receival.getAddress();
+							DatagramSocket newClientSocket = new DatagramSocket();
 							serverSocket.send(send);
 							while (true) {		
 								byte[] serverReceival = new byte[516];
@@ -327,7 +329,7 @@ public class ErrorSimulator extends Thread {
 								System.out.println("Received " + packetInfo(receiveFromServer) + " packet from Server");
 								server = receiveFromServer.getPort();
 								checkPacket(receiveFromServer, client);
-								DatagramPacket sendClientPacket = new DatagramPacket(serverReceival, receiveFromServer.getLength(), InetAddress.getLocalHost(), port);
+								DatagramPacket sendClientPacket = new DatagramPacket(serverReceival, receiveFromServer.getLength(), clientAddress, port);
 								System.out.println("Sending " + packetInfo(sendClientPacket) + " packet to Client");
 								newClientSocket.send(sendClientPacket);
 
