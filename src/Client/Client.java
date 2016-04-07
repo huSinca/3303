@@ -156,7 +156,7 @@ public class Client {
 		}
 		while (!validFileName) {
 			try {
-				file = JOptionPane.showInputDialog(null, "Enter File Name (including file extension ie. *.txt)", "Enter File Name", JOptionPane.INFORMATION_MESSAGE).toLowerCase();
+				file = JOptionPane.showInputDialog(null, "Enter File Name (including file extension ie. *.txt)", "Enter File Name", JOptionPane.INFORMATION_MESSAGE);
 				validFileName = true;
 			} catch (NullPointerException e) {
 				System.out.println("Closing client");
