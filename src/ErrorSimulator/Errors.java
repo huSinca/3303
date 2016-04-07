@@ -1,9 +1,9 @@
 package ErrorSimulator;
 
 public enum Errors {
-	INVALID_TID("error 5"),
-	ILLEGAL_TFTP_OP("error 4"),
-	NORMAL_MODE("normal");
+	INVALID_TID("2: error 5"),
+	ILLEGAL_TFTP_OP("1: error 4"),
+	NORMAL_MODE("0: normal");
 	
 	private String name;
 	

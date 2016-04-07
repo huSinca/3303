@@ -12,8 +12,11 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.security.AccessControlException;
+import java.util.HashSet;
 import java.util.Scanner;
 import java.util.Stack;
+
+import Client.Client;
 
 public class Server {
 
@@ -21,11 +24,8 @@ public class Server {
 	 * The path where the server will Read/Write
 	 */
 	private String path;
-
-	/**
-	 * The name of the file received from the request from the intermediate host
-	 */
-	private String receivedFileName;
+	
+	private HashSet<File> fileSet;
 
 	/**
 	 *  The name of the mode received from the request from the intermediate host
@@ -47,6 +47,7 @@ public class Server {
 	public Server() {
 		try {
 			transferSocket = new DatagramSocket(69);
+			fileSet = new HashSet<File>();
 		} catch (SocketException e) {
 			e.printStackTrace();
 		}
@@ -77,6 +78,7 @@ public class Server {
 			//Get the filename from the byte array
 			StringBuilder builder = new StringBuilder();
 		int index;
+		String receivedFileName = null;
 		for (index = 2; index < b.length; index++) {
 			if(b[index] != 0) {
 				builder.append((char) b[index]);
@@ -119,7 +121,7 @@ public class Server {
 	 * @param receivedPacket data held in the write request
 	 * @param port port number from which the write request came
 	 */
-	public void write(byte[] receivedPacket, int port, InetAddress address) {
+	public void write(byte[] receivedPacket, int port, InetAddress address, String receivedFileName) {
 		DatagramSocket transferSocket;	//Socket through which the transfer is done
 		DatagramPacket lastPacket = new DatagramPacket(new byte[516], 516);
 		byte block;	//The current block of data being transferred
@@ -138,11 +140,19 @@ public class Server {
 			System.out.println("Sending ACK");
 			transferSocket.send(establishPacket);
 
-			BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(path + "\\" + receivedFileName));
+			File f = new File(path + "\\" + receivedFileName);
+			if (fileSet.contains(f)) {
+				System.out.println("File in use");
+				error((byte)2, port, transferSocket, address);
+				return;
+			} 
+			fileSet.add(f);
+			BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(f));
 			while(true) {
 				byte[] receiveFile = new byte[516];
 				establishPacket = new DatagramPacket(receiveFile, receiveFile.length);
 				transferSocket.receive(establishPacket);
+				Client.analyzePacket(establishPacket);
 				System.out.println("Received a packet.");
 				if (!isValid(establishPacket.getData(), block, port)) {
 					System.out.println("Packet recieved from host has an invalid Opcode, reporting back to Host");
@@ -158,12 +168,16 @@ public class Server {
 						catch (AccessControlException e) {
 							System.out.println("Server does not have permission to access file.");
 							error((byte)2, port, transferSocket, address);
+							fileSet.remove(f);
+							return;
 						} catch (IOException e) {
 							//It's possible this may be able to catch multiple IO errors along with error 3, in
 							//which case we might be able to just add a switch that identifies which error occurred
 							System.out.println("IOException: " + e.getMessage());
 							//Send an ERROR packet with error code 3 (disk full)
 							error((byte)3, port, transferSocket, address);
+							fileSet.remove(f);
+							return;
 						}
 						lastPacket = establishPacket;
 					}
@@ -177,6 +191,7 @@ public class Server {
 					connection[3] = block;	//Update block field in the packet
 				}
 			}
+			fileSet.remove(f);
 			out.close();
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -188,16 +203,22 @@ public class Server {
 	 * @param receivedPacket data held in the read request
 	 * @param portport number from which the read request came
 	 */
-	public void read(byte[] receivedPacket, int port, InetAddress address) {
+	public void read(byte[] receivedPacket, int port, InetAddress address, String receivedFileName) {
 		DatagramSocket transferSocket;	//Socket through which the transfer is done
 		byte block;	//The current block of data being transferred
 		byte[] receive = new byte[4];	//Buffer for incoming packets
 		DatagramPacket received = new DatagramPacket(receive, receive.length);	//Holds incoming packets
 		block = (byte) 1;
-		try {
+		try { 
 			transferSocket = new DatagramSocket();
 			byte[] sendingData = new byte[512];
-			BufferedInputStream input = new BufferedInputStream(new FileInputStream(path + "\\" + receivedFileName));
+			File f = new File(path + "\\" + receivedFileName);
+			if (fileSet.contains(f)) {
+				System.out.println("File in use");
+				error((byte)2, port, transferSocket, address);
+				return;
+			}
+			BufferedInputStream input = new BufferedInputStream(new FileInputStream(f));
 			int x;	//End of stream indicator
 			while ((x = input.read(sendingData)) != -1) {
 				byte[] connection = new byte[516];	//Buffer for outgoing packets
@@ -275,6 +296,7 @@ public class Server {
 				error = false;
 				transferSocket.setSoTimeout(timeout);
 				transferSocket.receive(receivePacket);
+				Client.analyzePacket(receivePacket);
 				//Ensure received packet is a valid TFTP operation
 				if (!isValid(receivePacket.getData(), receivePacket.getData()[3], port)) {
 					System.out.println("Error, illegal TFTP operation!");
@@ -289,9 +311,21 @@ public class Server {
 				}
 			}
 		} catch (IOException e) {
-			e.printStackTrace();
+			
 		}
 		return receivePacket;
+	}
+	
+	public String extractName(byte[] b) {
+		StringBuilder builder = new StringBuilder();
+		for (int index = 2; index < b.length; index++) {
+			if(b[index] != 0) {
+				builder.append((char) b[index]);
+			} else {
+				break;
+			}
+		}
+		return builder.toString();
 	}
 
 	/**
@@ -340,9 +374,11 @@ public class Server {
 
 				//Server receives a read or write request
 				transferSocket.receive(receival);
+				Client.analyzePacket(receival);
 				System.out.println("Received a packet.");
 				int port = receival.getPort();
 				InetAddress address = receival.getAddress();
+				String receivedFileName = extractName(b);
 				if (isValid(b, (byte) 0, port)) {
 					new Thread(new Runnable() {
 						@Override
@@ -360,7 +396,7 @@ public class Server {
 									}
 									return;
 								}
-								read(b, port, address);
+								read(b, port, address, receivedFileName);
 							} else if (b[1] == 2) {
 								System.out.println("Write request recieved");
 								if (new File(path + "\\" + receivedFileName).exists()) {
@@ -372,7 +408,7 @@ public class Server {
 									}
 									return;
 								}
-								write(b, port, address);
+								write(b, port, address, receivedFileName);
 							} else {
 								System.out.println("ERR");
 							}

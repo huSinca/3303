@@ -88,14 +88,16 @@ public class Client {
 	}
 	
 	public static void analyzePacket(DatagramPacket packet) {
+		System.out.println("--------------------------------------------");
 		byte[] received = packet.getData();
 		System.out.println("Packet Opcode: " + received[1]);
 		System.out.println("Packet Type: " + ErrorSimulator.packetInfo(packet));
 		System.out.print("Packet Contents: ");
 		for (int i = 0; i < packet.getLength(); i++)  {
-			System.out.println(received[i]);
+			System.out.print(received[i] + " ");
 		}
 		System.out.println();
+		System.out.println("--------------------------------------------");
 	}
 
 	/**
@@ -187,6 +189,7 @@ public class Client {
 				error = false;
 				receiveSocket.setSoTimeout(timeout);
 				receiveSocket.receive(receivePacket);
+				analyzePacket(receivePacket);
 				System.out.println("Received a " + ErrorSimulator.packetInfo(receivePacket) + " packet");
 				//Ensure received packet is a valid TFTP operation
 				if (!isValid(receivePacket.getData(), receivePacket.getData()[3], receivePacket.getPort())) {
@@ -304,6 +307,7 @@ public class Client {
 				DatagramPacket lastPacket = received;
 				System.out.println("Waiting for a response...");
 				sendReceive.receive(received);
+				analyzePacket(received);
 				if (receive[1] == 5 && receive[3] == 1) {
 					System.out.println("File wasn't found");
 					//continue; This is what broke everything in the demo btw DB
@@ -401,7 +405,6 @@ public class Client {
 							}
 							lastPacket = fileTransfer;
 						}
-						printByteArray(fileTransfer.getData(), fileTransfer.getLength());
 						System.out.println("Sending ACK packet back to server");
 						sendReceive.send(acknowledge);
 						x = fileTransfer.getLength();
