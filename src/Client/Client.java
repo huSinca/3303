@@ -426,7 +426,7 @@ public class Client {
 		}
 	}
 
-	public static void main(String args[]) throws HeadlessException, UnknownHostException {
+	public static void main(String args[]) {
 		Client c = new Client();
 		String test = JOptionPane.showInputDialog(null, "Would you like to run in test mode (y or n) ", "Test Mode?", JOptionPane.INFORMATION_MESSAGE);
 		while (!test.equals("y") && !test.equals("n")) {
@@ -434,7 +434,12 @@ public class Client {
 		}
 		if (test.equals("y")) c.sendPort = 68;
 		else c.sendPort = 69;
-		c.serverAddress = InetAddress.getByName(JOptionPane.showInputDialog(null, "Enter the address of the server", "Enter Address", JOptionPane.INFORMATION_MESSAGE));
+		try {
+			c.serverAddress = InetAddress.getByName(JOptionPane.showInputDialog(null, "Enter the address of the server", "Enter Address", JOptionPane.INFORMATION_MESSAGE));
+		} catch (Exception e) {
+			System.out.println("Incorrect host name");
+			return;
+		}
 		System.out.println("Successfully connected to: " + c.serverAddress);
 		c.path = JOptionPane.showInputDialog(null, "Enter path where Client will Read/Write", "Enter Path", JOptionPane.INFORMATION_MESSAGE);
 		if(c.path == null){
